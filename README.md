@@ -23,9 +23,9 @@ Requires the .NET 8 SDK and Windows.
 
 ```powershell
 cd trs80mc10
-dotnet build src\MC10.App -c Release
+dotnet build MC10.sln -c Release
 dotnet run --project src\MC10.App -- --rom C:\path\to\mc10.rom
-dotnet test tests\MC10.Tests
+dotnet test MC10.sln
 ```
 
 Optional arguments: `--symbols FILE` (lines of `NAME ADDRESS`, `;` comments allowed) and `--config FILE.json`.
