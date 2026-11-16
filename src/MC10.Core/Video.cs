@@ -54,18 +54,19 @@ namespace MC10.Core
         }
 
         /// <summary>
-        /// Maps a text code to the glyph drawn and whether it is shown in reverse video.
-        /// Per the manual, lowercase letters appear as capitals in reverse video, and $60 is a blank.
+        /// Maps a text code to the glyph drawn and whether it is reverse video (6847-style layout,
+        /// confirmed by the ROM banner: "1982" is stored as $71 $79 $78 $72).
+        /// $00-$3F reverse video (ASCII $40-$5F then $20-$3F); $40-$5F normal; $60-$7F normal, ASCII = code-$40.
         /// </summary>
         public static void Glyph(byte code, out char ch, out bool inverse)
         {
             inverse = false;
             ch = ' ';
-            if (code >= 0x80 || code == 0x60) return;          // semigraphics / blank
+            if (code >= 0x80) return;                          // semigraphics
             if (code < 0x20) { inverse = true; ch = (char)(code + 0x40); }
-            else if (code < 0x60) ch = (char)code;             // digits, symbols, capitals
-            else if (code <= 0x7A) { inverse = true; ch = (char)(code - 0x20); }
-            else ch = (char)code;                              // $7B-$7F
+            else if (code < 0x40) { inverse = true; ch = (char)code; }
+            else if (code < 0x60) ch = (char)code;
+            else ch = (char)(code - 0x40);
         }
 
         /// <summary>Printable character for a code, or a quadrant glyph for block graphics.</summary>
