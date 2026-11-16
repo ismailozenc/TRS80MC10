@@ -1,8 +1,8 @@
 {
   "ClockHz": 894886,
-  "RamBase": 0,
+  "RamBase": 16384,
   "RamSize": 4096,
-  "VideoBase": 1024,
+  "VideoBase": 16384,
   "Columns": 32,
   "Rows": 16,
   "RomBase": 57344,
@@ -11,5 +11,7 @@
   "KeyboardData": 32768,
   "KeyboardStatus": 32769,
   "SoundRegister": 32770,
+  "InternalRamBase": 64,
+  "InternalRamSize": 192,
   "VideoControl": 32771
 }
