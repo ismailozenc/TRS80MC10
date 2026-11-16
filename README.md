@@ -8,6 +8,7 @@ A Motorola 6803 based MC-10 emulator for Windows, with:
 - **Screen**: 32 x 16 text with the nine MC-10 colours and 2x2 block graphics.
 - **Keyboard**: a real key matrix (port 1 strobe, rows on `$BFFF`); host characters are replayed as timed key taps. Esc = BREAK, Backspace/Left = CONTROL+A.
 - **Sound**: each write is recorded (cycle and pitch) for inspection.
+- **Disassembler / analyzer**: recursive-descent analysis of the ROM from the interrupt vectors. Labels subroutines (`sub_XXXX`), branch targets (`loc_XXXX`), data (`data_XXXX`), vectors (`reset`, `irq_isr`...), pointer tables (`tbl_`/`fn_`), RAM hooks (`ramfn_`) and 6803 registers (`PORT1`, `KBD_VDG`...). Whole-ROM listing in the debugger (**ROM listing** tab, go-to by address or name, breakpoints by double-click), **File > Export disassembly / Export symbols**.
 - **Debugger**: disassembly with breakpoints, single-step and step-over, run-to-cursor, registers and flags, hex memory with poke, write-watchpoints, instruction history, and a **trace log to file**.
 - **Tests**: xUnit tests for flag rules, stack and interrupt sequencing, watchpoints, breakpoints, EPROM policy and image loaders.
 
@@ -39,7 +40,8 @@ To create a config file with the defaults, call `MachineConfig.Default().Save("m
 | Run / pause | F5 |
 | Reset | Ctrl+R |
 | Debugger window | F12 |
-| Debugger: step / step over / run-pause | F10 / F11 / F5 |
+| Debugger: step / step over / step out / run-pause | F10 / F11 / Shift+F11 / F5 |
+| Main window: Machine menu has Run/Pause (F5), Pause (F6), Step (F10), Step over (F11), Step out (Shift+F11) | |
 | Debugger: toggle breakpoint on the selected line | Ctrl+B or double-click |
 
 Typed letters are sent in uppercase, matching the MC-10's default all-caps keyboard. Enter, Backspace, and the Left arrow (as backspace) are supported. Esc sends BREAK.

@@ -37,7 +37,11 @@ namespace MC10.Core
         public VideoControlDevice VideoControl { get; }
 
         public readonly HashSet<ushort> Breakpoints = new HashSet<ushort>();
+        /// <summary>Names loaded by the user (symbol file). These win over automatic names.</summary>
         public readonly Dictionary<ushort, string> Symbols = new Dictionary<ushort, string>();
+        /// <summary>Names produced by <see cref="CodeAnalyzer"/> for the loaded ROM.</summary>
+        public readonly Dictionary<ushort, string> AutoSymbols = new Dictionary<ushort, string>();
+        public Analysis Analysis { get; private set; }
         public TextWriter Trace { get; set; }
         public StopReason LastStop { get; private set; }
         public ushort LastWatchAddress { get; private set; }
@@ -85,6 +89,7 @@ namespace MC10.Core
             byte[] image = ImageLoader.Flatten(segments, Config.RomBase, Config.RomSize);
             Rom = new Eprom(Config.RomBase, image, mode ?? Config.RomMode);
             Bus.MapRom(Rom);
+            Reanalyze();
             Cpu.Reset();
         }
 
@@ -109,7 +114,40 @@ namespace MC10.Core
             }
         }
 
-        public string SymbolFor(ushort addr) => Symbols.TryGetValue(addr, out var s) ? s : null;
+        /// <summary>User or automatic label for a code/data address (no hardware register names).</summary>
+        public string CodeSymbolFor(ushort addr)
+        {
+            if (Symbols.TryGetValue(addr, out var s)) return s;
+            return AutoSymbols.TryGetValue(addr, out s) ? s : null;
+        }
+
+        /// <summary>Label for any address, including the 6803 registers and the keyboard latch.</summary>
+        public string SymbolFor(ushort addr) => CodeSymbolFor(addr) ?? Hardware.NameFor(addr);
+
+        /// <summary>Re-run the static analysis on the loaded ROM and refresh the automatic labels.</summary>
+        public void Reanalyze()
+        {
+            AutoSymbols.Clear();
+            Analysis = null;
+            if (Rom == null) return;
+            Analysis = CodeAnalyzer.Analyze(Rom.Data, Rom.Base);
+            foreach (var kv in Analysis.Labels) AutoSymbols[kv.Key] = kv.Value;
+        }
+
+        public List<ListingLine> BuildListing()
+        {
+            if (Analysis == null) return new List<ListingLine>();
+            string title = $"TRS-80 MC-10 ROM disassembly   CRC32 {Rom.Crc32():X8}";
+            return Listing.Build(Analysis, SymbolFor, CodeSymbolFor, title);
+        }
+
+        public void SaveSymbols(string path)
+        {
+            var all = new SortedDictionary<ushort, string>();
+            foreach (var kv in AutoSymbols) all[kv.Key] = kv.Value;
+            foreach (var kv in Symbols) all[kv.Key] = kv.Value;
+            File.WriteAllLines(path, all.Select(kv => $"{kv.Value} ${kv.Key:X4}"));
+        }
 
         /// <summary>Hardware reset: CPU, timers and devices reset; RAM and ROM are preserved.</summary>
         public void Reset()
@@ -138,7 +176,7 @@ namespace MC10.Core
             string text = null;
             if (Trace != null || HistoryLimit > 0)
             {
-                text = Disassembler.Disassemble(Bus.Read, pc, out int len, SymbolFor);
+                text = Disassembler.Disassemble(Bus.Read, pc, out int len, SymbolFor, CodeSymbolFor);
                 if (Trace != null)
                 {
                     string bytes = Disassembler.HexBytes(Bus.Read, pc, len);
@@ -220,6 +258,27 @@ namespace MC10.Core
                 if (r != StopReason.None) return r;
             }
             return StopReason.Budget;
+        }
+
+        /// <summary>
+        /// Run until the current subroutine returns (an RTS/RTI that leaves the stack above where it started).
+        /// Nested calls run to completion. Stops early on breakpoint, watchpoint or illegal opcode.
+        /// </summary>
+        public StopReason StepOut(long maxCycles = 50_000_000)
+        {
+            ushort startSp = Cpu.SP;
+            long end = Cpu.Cycles + maxCycles;
+            bool first = true;
+            while (Cpu.Cycles < end)
+            {
+                byte op = Bus.Read(Cpu.PC);
+                StopReason r = Step(ignoreBreakpoint: first);
+                first = false;
+                if (r != StopReason.None) return r;
+                if ((op == 0x39 || op == 0x3B) && Cpu.SP > startSp) return StopReason.None;
+            }
+            LastStop = StopReason.Budget;
+            return LastStop;
         }
 
         public IReadOnlyCollection<HistoryEntry> History => history;

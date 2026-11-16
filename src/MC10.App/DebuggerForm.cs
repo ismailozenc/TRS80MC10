@@ -19,6 +19,12 @@ namespace MC10.App
         readonly Machine machine;
 
         readonly ListBox disasm;
+        readonly TabControl tabs;
+        readonly TabPage listingPage;
+        readonly ListingPanel listingPanel;
+        readonly ListBox symbolList;
+        Analysis symbolsFor;
+        int symbolCount = -1;
         readonly List<ushort> disasmAddrs = new List<ushort>();
         readonly TextBox regs, memory, history, pokeAddr, pokeValue, memAddr, watchAddr;
         readonly ListBox watches;
@@ -43,6 +49,7 @@ namespace MC10.App
             runBtn = Btn(bar, "Run (F5)", (s, e) => session.Toggle());
             Btn(bar, "Step (F10)", (s, e) => session.StepInstruction());
             Btn(bar, "Step over (F11)", (s, e) => session.StepOverInstruction());
+            Btn(bar, "Step out (Shift+F11)", (s, e) => session.StepOutInstruction());
             Btn(bar, "Run to cursor", (s, e) => RunToCursor());
             Btn(bar, "Toggle BP (Ctrl+B)", (s, e) => ToggleBreakpointAtSelection());
             Btn(bar, "Reset", (s, e) => session.HardReset());
@@ -109,12 +116,32 @@ namespace MC10.App
             history.Dock = DockStyle.Fill;
             right.Controls.Add(Group("History (last instructions)", history), 0, 4);
 
-            Controls.Add(disasm);
+            // ---- left side: live disassembly from PC, whole-ROM listing, label list
+            tabs = new TabControl { Dock = DockStyle.Fill };
+            var livePage = new TabPage("Live (from PC)");
+            livePage.Controls.Add(disasm);
+            listingPanel = new ListingPanel(machine, a =>
+            {
+                if (!machine.Breakpoints.Remove(a)) machine.Breakpoints.Add(a);
+                RefreshAll();
+            });
+            listingPage = new TabPage("ROM listing");
+            listingPage.Controls.Add(listingPanel);
+            symbolList = new ListBox { Dock = DockStyle.Fill, Font = mono, IntegralHeight = false };
+            symbolList.DoubleClick += (s, e) => GoToSelectedSymbol();
+            var symbolPage = new TabPage("Labels");
+            symbolPage.Controls.Add(symbolList);
+            tabs.TabPages.Add(livePage);
+            tabs.TabPages.Add(listingPage);
+            tabs.TabPages.Add(symbolPage);
+            tabs.SelectedIndexChanged += (s, e) => RefreshAll();
+
+            Controls.Add(tabs);
             Controls.Add(right);
             Controls.Add(bar);
             Controls.Add(status);
             // Dock order: the fill control must come last among docked children.
-            disasm.BringToFront();
+            tabs.BringToFront();
 
             refresh = new Timer { Interval = 250 };
             // While running, only light-weight panes refresh; the full redraw (which rebuilds the
@@ -165,7 +192,10 @@ namespace MC10.App
             {
                 case Keys.F5: session.Toggle(); e.Handled = true; break;
                 case Keys.F10: session.StepInstruction(); e.Handled = true; break;
-                case Keys.F11: session.StepOverInstruction(); e.Handled = true; break;
+                case Keys.F11:
+                    if (e.Shift) session.StepOutInstruction(); else session.StepOverInstruction();
+                    e.Handled = true;
+                    break;
                 case Keys.B when e.Control: ToggleBreakpointAtSelection(); e.Handled = true; break;
             }
         }
@@ -224,6 +254,8 @@ namespace MC10.App
             RefreshHistory();
             RefreshWatches();
             RefreshMemory();
+            RefreshSymbols();
+            listingPanel.Sync(session.Running);
             runBtn.Text = session.Running ? "Pause (F5)" : "Run (F5)";
             status.Text = $"{(session.Running ? "RUNNING" : "paused")}   last stop: {machine.LastStop}   cycles: {machine.Cpu.Cycles:N0}" +
                           (machine.Rom != null ? $"   ROM CRC32 {machine.Rom.Crc32():X8}" : "   no ROM");
@@ -235,6 +267,7 @@ namespace MC10.App
         {
             if (IsDisposed) return;
             RefreshRegs();
+            if (tabs.SelectedTab == listingPage) listingPanel.Sync(true);
             // Follow the running PC: re-centre the listing about once a second, only when the PC
             // has left the instructions currently shown.
             if (!disasmAddrs.Contains(machine.Cpu.PC) && (DateTime.UtcNow - lastLiveDisasm).TotalSeconds >= 1)
@@ -245,6 +278,30 @@ namespace MC10.App
             status.Text = $"RUNNING   PC={machine.Cpu.PC:X4}   cycles: {machine.Cpu.Cycles:N0}" +
                           (machine.Rom != null ? $"   ROM CRC32 {machine.Rom.Crc32():X8}" : "   no ROM");
             runBtn.Text = "Pause (F5)";
+        }
+
+        void RefreshSymbols()
+        {
+            int count = machine.Symbols.Count;
+            if (ReferenceEquals(symbolsFor, machine.Analysis) && symbolCount == count) return;
+            symbolsFor = machine.Analysis;
+            symbolCount = count;
+            var all = new SortedDictionary<ushort, string>();
+            foreach (var kv in machine.AutoSymbols) all[kv.Key] = kv.Value;
+            foreach (var kv in machine.Symbols) all[kv.Key] = kv.Value;
+            symbolList.BeginUpdate();
+            symbolList.Items.Clear();
+            foreach (var kv in all) symbolList.Items.Add($"{kv.Key:X4}  {kv.Value}");
+            symbolList.EndUpdate();
+        }
+
+        void GoToSelectedSymbol()
+        {
+            if (symbolList.SelectedItem == null) return;
+            string text = symbolList.SelectedItem.ToString();
+            if (!ushort.TryParse(text.Substring(0, 4), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out ushort a)) return;
+            tabs.SelectedTab = listingPage;
+            listingPanel.GoTo(a);
         }
 
         void RefreshDisasm()
@@ -277,7 +334,8 @@ namespace MC10.App
         {
             var c = machine.Cpu;
             var sb = new StringBuilder();
-            sb.AppendLine($"PC  {c.PC:X4}    SP {c.SP:X4}");
+            string pcName = machine.CodeSymbolFor(c.PC);
+            sb.AppendLine($"PC  {c.PC:X4}    SP {c.SP:X4}" + (pcName != null ? $"   {pcName}" : ""));
             sb.AppendLine($"A   {c.A:X2}      B  {c.B:X2}      D {c.D:X4}");
             sb.AppendLine($"X   {c.X:X4}");
             byte cc = (byte)(c.CC | 0xC0);

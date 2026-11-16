@@ -75,6 +75,14 @@ namespace MC10.App
             return r;
         }
 
+        public StopReason StepOutInstruction()
+        {
+            Pause();
+            StopReason r = Machine.StepOut();
+            StateChanged?.Invoke();
+            return r;
+        }
+
         public void HardReset()
         {
             Pause();

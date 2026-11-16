@@ -41,11 +41,18 @@ namespace MC10.App
             file.DropDownItems.Add(Item("&Open ROM...", Keys.None, (s, e) => OpenRom()));
             file.DropDownItems.Add(Item("Load &symbols...", Keys.None, (s, e) => OpenSymbols()));
             file.DropDownItems.Add(Item("Save &screenshot...", Keys.None, (s, e) => SaveScreenshot()));
+            file.DropDownItems.Add(Item("Export &disassembly...", Keys.None, (s, e) => ExportDisassembly()));
+            file.DropDownItems.Add(Item("&Export symbols...", Keys.None, (s, e) => ExportSymbols()));
             file.DropDownItems.Add(new ToolStripSeparator());
             file.DropDownItems.Add(Item("E&xit", Keys.None, (s, e) => Close()));
 
             var mach = new ToolStripMenuItem("&Machine");
             mach.DropDownItems.Add(Item("&Run / Pause  (F5)", Keys.F5, (s, e) => session.Toggle()));
+            mach.DropDownItems.Add(Item("&Pause  (F6)", Keys.F6, (s, e) => session.Pause()));
+            mach.DropDownItems.Add(Item("&Step instruction  (F10)", Keys.F10, (s, e) => session.StepInstruction()));
+            mach.DropDownItems.Add(Item("Step &over  (F11)", Keys.F11, (s, e) => session.StepOverInstruction()));
+            mach.DropDownItems.Add(Item("Step o&ut  (Shift+F11)", Keys.Shift | Keys.F11, (s, e) => session.StepOutInstruction()));
+            mach.DropDownItems.Add(new ToolStripSeparator());
             mach.DropDownItems.Add(Item("&Reset  (Ctrl+R)", Keys.Control | Keys.R, (s, e) => session.HardReset()));
             mach.DropDownItems.Add(Item("Open &debugger  (F12)", Keys.F12, (s, e) => ShowDebugger()));
             mach.DropDownItems.Add(new ToolStripSeparator());
@@ -241,6 +248,24 @@ namespace MC10.App
                 session.Machine.LoadSymbols(dlg.FileName);
                 debugger?.RefreshAll();
             }
+        }
+
+        void ExportDisassembly()
+        {
+            if (session.Machine.Analysis == null)
+            {
+                MessageBox.Show(this, "Load a ROM first.", "Export disassembly");
+                return;
+            }
+            using var dlg = new SaveFileDialog { Filter = "Assembly listing|*.asm;*.txt", FileName = "mc10-rom.asm" };
+            if (dlg.ShowDialog(this) != DialogResult.OK) return;
+            File.WriteAllText(dlg.FileName, Listing.ToText(session.Machine.BuildListing()));
+        }
+
+        void ExportSymbols()
+        {
+            using var dlg = new SaveFileDialog { Filter = "Symbol file|*.sym;*.txt", FileName = "mc10.sym" };
+            if (dlg.ShowDialog(this) == DialogResult.OK) session.Machine.SaveSymbols(dlg.FileName);
         }
 
         void SaveScreenshot()

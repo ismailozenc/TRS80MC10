@@ -38,6 +38,13 @@ the keyboard matrix or the video-chip wiring. The emulator therefore uses these 
 Replace the placeholders by editing the JSON config (`MachineConfig.Save` writes the defaults) once the
 real addresses are confirmed from the firmware or a schematic.
 
+## Disassembly
+
+The listing comes from static analysis (`CodeAnalyzer`), not from running the firmware. It follows branches, jumps and
+calls from the eight interrupt vectors, and treats runs of 3+ valid code pointers in leftover bytes as dispatch tables
+(entries named `fn_XXXX`). Code reached only through `JMP n,X` or RAM vectors can show up as data. Names are
+automatic; load your own with a symbol file (`NAME $ADDR`) and they win over the automatic ones.
+
 ## CPU timing
 
 Instruction cycle counts follow the MC6800/6803 data-sheet family. Some are grouped in the data sheet, so

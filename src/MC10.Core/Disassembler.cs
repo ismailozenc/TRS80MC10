@@ -10,7 +10,7 @@ namespace MC10.Core
         /// <paramref name="read"/> supplies bytes; <paramref name="symbol"/> optionally names addresses.
         /// </summary>
         public static string Disassemble(Func<ushort, byte> read, ushort pc, out int length,
-                                         Func<ushort, string> symbol = null)
+                                         Func<ushort, string> symbol = null, Func<ushort, string> immSymbol = null)
         {
             byte op = read(pc);
             OpInfo info = Opcodes.Table[op];
@@ -38,11 +38,19 @@ namespace MC10.Core
                     operand = $"#${read((ushort)(pc + 1)):X2}";
                     break;
                 case Mode.Imm16:
-                    operand = $"#${Word(read, (ushort)(pc + 1)):X4}";
+                {
+                    ushort v = Word(read, (ushort)(pc + 1));
+                    string s = immSymbol?.Invoke(v);
+                    operand = s != null ? "#" + s : $"#${v:X4}";
                     break;
+                }
                 case Mode.Dir:
-                    operand = $"${read((ushort)(pc + 1)):X2}";
+                {
+                    byte v = read((ushort)(pc + 1));
+                    string s = symbol?.Invoke(v);
+                    operand = s ?? $"${v:X2}";
                     break;
+                }
                 case Mode.Idx:
                     operand = $"${read((ushort)(pc + 1)):X2},X";
                     break;
