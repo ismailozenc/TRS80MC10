@@ -9,7 +9,7 @@ namespace MC10.Core
     /// $0000-$001F, and the interrupt model (NMI, IRQ1, ICI, OCI, TOI, SCI, SWI, RESET).
     /// Condition codes: C=01 V=02 Z=04 N=08 I=10 H=20.
     /// </summary>
-    public sealed class Cpu6803
+    public sealed class Cpu6803 : IIoHandler
     {
         public const byte FlagC = 0x01, FlagV = 0x02, FlagZ = 0x04, FlagN = 0x08, FlagI = 0x10, FlagH = 0x20;
         const byte CcrMask = 0x3F;
@@ -45,7 +45,7 @@ namespace MC10.Core
         public Cpu6803(Bus bus)
         {
             this.bus = bus;
-            bus.Io = this;
+            bus.AttachIo(this);      // maps $0000-$001F to the internal registers
             Reset();
         }
 
