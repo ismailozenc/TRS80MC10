@@ -14,10 +14,15 @@ namespace MC10.Core
     {
         public int ClockHz { get; set; } = 894886;        // ~0.89 MHz E-clock (assumed)
 
-        public int RamBase { get; set; } = 0x0000;
+        // Firmware evidence (see docs/ASSUMPTIONS.md): variables and vectors at $4200-$42FF,
+        // stack near $419A, and a test of $00EA. That suggests 6803 internal RAM at $0040-$00FF
+        // plus 4 KB external RAM at $4000-$4FFF.
+        public int InternalRamBase { get; set; } = 0x0040;
+        public int InternalRamSize { get; set; } = 0x00C0;
+        public int RamBase { get; set; } = 0x4000;
         public int RamSize { get; set; } = 4096;          // ~4 KB, consistent with the manual's MEM figure
 
-        public int VideoBase { get; set; } = 0x0400;      // text screen RAM (assumed)
+        public int VideoBase { get; set; } = 0x4000;      // GUESS: text screen RAM, not yet confirmed from firmware
         public int Columns { get; set; } = 32;            // from the manual
         public int Rows { get; set; } = 16;               // 32 x 16 = 512 print positions (manual)
 

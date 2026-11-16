@@ -50,6 +50,7 @@ namespace MC10.Core
         {
             Config = config ?? MachineConfig.Default();
             Bus = new Bus();
+            Bus.MapRam(Config.InternalRamBase, Config.InternalRamSize);
             Bus.MapRam(Config.RamBase, Config.RamSize);
 
             Cpu = new Cpu6803(Bus);

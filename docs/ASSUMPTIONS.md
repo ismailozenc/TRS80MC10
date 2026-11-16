@@ -26,8 +26,9 @@ the keyboard matrix or the video-chip wiring. The emulator therefore uses these 
 | Item | Default | Status |
 |---|---|---|
 | Clock | 894886 Hz | Assumed (about 0.89 MHz) |
-| RAM | `$0000`-`$0FFF` | Assumed. Internal 6803 registers overlay `$0000`-`$001F`. |
-| Text screen RAM | `$0400`, 512 bytes | Assumed |
+| Internal RAM | `$0040`-`$00FF` (128 bytes) | Standard 6803 location. Firmware writes `$00BD` and tests `$00EA`. |
+| External RAM | `$4000`-`$4FFF`, 4 KB | Inferred from firmware: variables/vectors at `$4200`-`$42FF`, stack near `$419A`, `LDX $4221`. Internal 6803 registers overlay `$0000`-`$001F`. |
+| Text screen RAM | `$4000`, 512 bytes | **Guess.** Not yet located in the firmware. |
 | ROM window | `$E000`-`$FFFF`, 8 KB (matches the uploaded 8 KB image, whose reset vector `$FFFE` = `$F72E`) | Assumed from the image size and vectors, not from the manual. The 6803 vectors at `$FFF0`-`$FFFF` are architectural. A 16 KB layout is still possible via config. |
 | Keyboard | `$8000` data, `$8001` status (queue model) | **Placeholder.** The real MC-10 keyboard is scanned through a matrix. |
 | Sound register | `$8002` | **Placeholder.** The frequency mapping is not implemented; the events are recorded for inspection. |
