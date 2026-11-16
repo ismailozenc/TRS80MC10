@@ -4,3 +4,9 @@ obj/
 *.user
 *.suo
 TestResults/
+
+# Firmware images are copyrighted; never commit them
+*.bin
+*.BIN
+*.rom
+*.ROM

@@ -1,0 +1,15 @@
+{
+  "ClockHz": 894886,
+  "RamBase": 0,
+  "RamSize": 4096,
+  "VideoBase": 1024,
+  "Columns": 32,
+  "Rows": 16,
+  "RomBase": 57344,
+  "RomSize": 8192,
+  "RomMode": "ReadOnly",
+  "KeyboardData": 57344,
+  "KeyboardStatus": 57345,
+  "SoundRegister": 57346,
+  "VideoControl": 57347
+}
