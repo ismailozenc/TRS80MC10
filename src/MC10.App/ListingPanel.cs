@@ -175,7 +175,9 @@ namespace MC10.App
             bool atPc = isCode && l.Address == machine.Cpu.PC;
             bool bp = isCode && machine.Breakpoints.Contains(l.Address);
             bool selected = (e.State & DrawItemState.Selected) != 0;
-            Color back = atPc ? Color.FromArgb(255, 240, 150) : selected ? SystemColors.Highlight : SystemColors.Window;
+            bool covered = isCode && machine.Executed[l.Address];
+            Color back = atPc ? Color.FromArgb(255, 240, 150) : selected ? SystemColors.Highlight
+                       : covered ? Color.FromArgb(226, 245, 226) : SystemColors.Window;   // green = executed so far
             Color fore = selected && !atPc ? SystemColors.HighlightText : ColorFor(l.Kind);
             using (var b = new SolidBrush(back)) e.Graphics.FillRectangle(b, e.Bounds);
             if (bp)

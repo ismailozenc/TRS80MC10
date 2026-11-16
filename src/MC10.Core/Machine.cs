@@ -99,6 +99,74 @@ namespace MC10.Core
             LoadRom(ImageLoader.Load(path, b));
         }
 
+        // ---- dynamic analysis: what the running firmware really executed
+        /// <summary>Record executed addresses and indirect call/jump targets while stepping.</summary>
+        public bool RecordCoverage = true;
+        public readonly bool[] Executed = new bool[65536];
+        public readonly HashSet<ushort> RuntimeTargets = new HashSet<ushort>();
+
+        public int CoveredInstructions { get { int n = 0; foreach (bool b in Executed) if (b) n++; return n; } }
+
+        public void ClearCoverage()
+        {
+            Array.Clear(Executed, 0, Executed.Length);
+            RuntimeTargets.Clear();
+        }
+
+        /// <summary>Re-run the static analysis using the call targets observed at run time.</summary>
+        public void ReanalyzeWithRunData() => Reanalyze();
+
+        public void SaveCoverage(string path)
+        {
+            var lines = new List<string> { "; executed instruction address ranges" };
+            int i = 0;
+            while (i < 65536)
+            {
+                if (!Executed[i]) { i++; continue; }
+                int s = i;
+                while (i < 65536 && Executed[i]) i++;
+                lines.Add($"${s:X4} ${i - 1:X4}");
+            }
+            lines.Add("; runtime targets");
+            foreach (ushort t in RuntimeTargets.OrderBy(x => x)) lines.Add($"T ${t:X4}");
+            File.WriteAllLines(path, lines);
+        }
+
+        /// <summary>Load a .cov (ranges) or .targets (one address per line) file produced by tools/mc10_label.py or SaveCoverage.</summary>
+        public void LoadRunData(string path)
+        {
+            foreach (string raw in File.ReadAllLines(path))
+            {
+                string line = raw.Split(';')[0].Trim();
+                if (line.Length == 0) continue;
+                string[] p = line.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                bool target = p[0] == "T";
+                if (target) p = p.Skip(1).ToArray();
+                ushort a, b;
+                if (p.Length == 0 || !TryHex(p[0], out a)) continue;
+                if (p.Length > 1 && TryHex(p[1], out b) && !target)
+                    for (int x = a; x <= b; x++) Executed[x] = true;
+                else if (target || Path.GetExtension(path).Equals(".targets", StringComparison.OrdinalIgnoreCase))
+                    RuntimeTargets.Add(a);
+                else Executed[a] = true;
+            }
+        }
+
+        static bool TryHex(string s, out ushort v)
+        {
+            s = s.TrimStart('$');
+            return ushort.TryParse(s, System.Globalization.NumberStyles.HexNumber, null, out v);
+        }
+
+        /// <summary>Queue BASIC source (or any text) as key presses. Returns the number of characters that have no key.</summary>
+        public int TypeText(string text)
+        {
+            int skipped = 0;
+            foreach (char ch in text.Replace("\r\n", "\r").Replace('\n', '\r'))
+                if (!Keyboard.TapChar(ch)) skipped++;
+            return skipped;
+        }
+
         public void LoadSymbols(string path)
         {
             foreach (string raw in File.ReadAllLines(path))
@@ -130,7 +198,7 @@ namespace MC10.Core
             AutoSymbols.Clear();
             Analysis = null;
             if (Rom == null) return;
-            Analysis = CodeAnalyzer.Analyze(Rom.Data, Rom.Base);
+            Analysis = CodeAnalyzer.Analyze(Rom.Data, Rom.Base, true, RuntimeTargets);
             foreach (var kv in Analysis.Labels) AutoSymbols[kv.Key] = kv.Value;
         }
 
@@ -187,7 +255,13 @@ namespace MC10.Core
 
             long illegalBefore = Cpu.IllegalCount;
             watchFired = false;
+            byte opcode = 0;
+            if (RecordCoverage) { Executed[pc] = true; opcode = Bus.Read(pc); }
             Cpu.Step();
+            // Indirect JMP/JSR n,X and JSR dir: remember where they really went.
+            if (RecordCoverage && (opcode == 0x6E || opcode == 0xAD || opcode == 0x9D) && Rom != null
+                && Cpu.PC >= Rom.Base && Cpu.PC < Rom.Base + Rom.Data.Length)
+                RuntimeTargets.Add(Cpu.PC);
 
             if (HistoryLimit > 0)
             {

@@ -14,6 +14,7 @@
 
   <!-- Copy a firmware dump placed in the project folder next to the executable. Never committed (see .gitignore). -->
   <ItemGroup>
+    <None Include="..\..\symbols\mc10.*" Link="symbols\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="*.bin;*.BIN;*.rom;*.ROM;*.hex;*.s19" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

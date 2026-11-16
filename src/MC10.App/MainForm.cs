@@ -66,8 +66,17 @@ namespace MC10.App
             }
             mach.DropDownItems.Add(speed);
 
+            var analysis = new ToolStripMenuItem("&Analysis");
+            analysis.DropDownItems.Add(Item("&Type BASIC file into the keyboard...", Keys.None, (s, e) => TypeBasicFile()));
+            analysis.DropDownItems.Add(new ToolStripSeparator());
+            analysis.DropDownItems.Add(Item("&Re-analyse ROM using run data", Keys.None, (s, e) => ReanalyseWithRunData()));
+            analysis.DropDownItems.Add(Item("&Load coverage / targets file...", Keys.None, (s, e) => LoadRunData()));
+            analysis.DropDownItems.Add(Item("&Save coverage...", Keys.None, (s, e) => SaveCoverage()));
+            analysis.DropDownItems.Add(Item("&Clear coverage", Keys.None, (s, e) => { session.Machine.ClearCoverage(); UpdateStatus(); }));
+
             menu.Items.Add(file);
             menu.Items.Add(mach);
+            menu.Items.Add(analysis);
             MainMenuStrip = menu;
             Controls.Add(menu);
 
@@ -100,6 +109,9 @@ namespace MC10.App
 
             if (!string.IsNullOrEmpty(romPath)) LoadRomFile(romPath);
             if (!string.IsNullOrEmpty(symbolsPath)) machine.LoadSymbols(symbolsPath);
+            foreach (string f in Program.FindDefaultRunData())
+                try { if (f.EndsWith(".sym")) machine.LoadSymbols(f); else machine.LoadRunData(f); } catch { }
+            machine.Reanalyze();
 
             KeyPress += (s, e) => HandleKeyPress(e);
             KeyDown += (s, e) => HandleKeyDown(e);
@@ -238,6 +250,38 @@ namespace MC10.App
             {
                 MessageBox.Show(this, ex.Message, "Could not load ROM", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        void TypeBasicFile()
+        {
+            using var dlg = new OpenFileDialog { Filter = "BASIC / text|*.bas;*.txt|All files|*.*", Title = "Type this file into the MC-10" };
+            if (dlg.ShowDialog(this) != DialogResult.OK) return;
+            int skipped = session.Machine.TypeText(File.ReadAllText(dlg.FileName));
+            if (!session.Running) session.Start();
+            if (skipped > 0)
+                MessageBox.Show(this, $"{skipped} character(s) have no key on the MC-10 and were skipped.", "Type BASIC file");
+        }
+
+        void ReanalyseWithRunData()
+        {
+            var m = session.Machine;
+            m.ReanalyzeWithRunData();
+            MessageBox.Show(this, $"{m.CoveredInstructions} instructions executed, {m.RuntimeTargets.Count} run-time targets.\n" +
+                                  $"{m.Analysis?.Subroutines.Count ?? 0} subroutines now labelled.", "Analysis");
+            debugger?.RefreshAll();
+        }
+
+        void LoadRunData()
+        {
+            using var dlg = new OpenFileDialog { Filter = "Coverage / targets|*.cov;*.targets|All files|*.*" };
+            if (dlg.ShowDialog(this) != DialogResult.OK) return;
+            session.Machine.LoadRunData(dlg.FileName);
+        }
+
+        void SaveCoverage()
+        {
+            using var dlg = new SaveFileDialog { Filter = "Coverage|*.cov", FileName = "mc10.cov" };
+            if (dlg.ShowDialog(this) == DialogResult.OK) session.Machine.SaveCoverage(dlg.FileName);
         }
 
         void OpenSymbols()

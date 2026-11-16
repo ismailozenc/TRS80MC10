@@ -76,7 +76,8 @@ namespace MC10.Core
         static readonly string[] VectorNames =
             { "sci_isr", "tof_isr", "oci_isr", "ici_isr", "irq_isr", "swi_isr", "nmi_isr", "reset" };
 
-        public static Analysis Analyze(byte[] rom, int baseAddr, bool followPointerTables = true)
+        public static Analysis Analyze(byte[] rom, int baseAddr, bool followPointerTables = true,
+                                       IEnumerable<ushort> extraEntries = null)
         {
             var an = new Analysis(rom, baseAddr);
             var work = new Queue<ushort>();
@@ -98,6 +99,11 @@ namespace MC10.Core
                 if (!vectorTargets.ContainsKey(target)) vectorTargets[target] = VectorNames[i];
                 work.Enqueue(target);
             }
+
+            // 1b. Entry points seen while the program was really running (indirect JSR/JMP through X).
+            if (extraEntries != null)
+                foreach (ushort t in extraEntries)
+                    if (an.Contains(t)) { subTargets.Add(t); work.Enqueue(t); }
 
             Flow(an, work, subTargets, jumpTargets, branchTargets, dataRefs, external);
 

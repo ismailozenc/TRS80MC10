@@ -36,6 +36,28 @@ namespace MC10.App
             Application.Run(new MainForm(config, rom, symbols));
         }
 
+        /// <summary>
+        /// Labels and run data produced by tools/mc10_label.py (symbols/mc10.sym, .targets, .cov), searched
+        /// from the build output folder upwards. Returned in load order (symbols first).
+        /// </summary>
+        internal static System.Collections.Generic.List<string> FindDefaultRunData()
+        {
+            var result = new System.Collections.Generic.List<string>();
+            var dir = new DirectoryInfo(AppContext.BaseDirectory);
+            for (int depth = 0; depth < 8 && dir != null; depth++, dir = dir.Parent)
+            {
+                string folder = Path.Combine(dir.FullName, "symbols");
+                if (!Directory.Exists(folder)) continue;
+                foreach (string name in new[] { "mc10.sym", "mc10.targets", "mc10.cov" })
+                {
+                    string f = Path.Combine(folder, name);
+                    if (File.Exists(f)) result.Add(f);
+                }
+                if (result.Count > 0) break;
+            }
+            return result;
+        }
+
         static readonly string[] RomExtensions = { ".bin", ".rom", ".hex", ".ihx", ".s19" };
 
         /// <summary>
