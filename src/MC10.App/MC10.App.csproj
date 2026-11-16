@@ -12,6 +12,11 @@
     <ApplicationHighDpiMode>SystemAware</ApplicationHighDpiMode>
   </PropertyGroup>
 
+  <!-- Copy a firmware dump placed in the project folder next to the executable. Never committed (see .gitignore). -->
+  <ItemGroup>
+    <None Include="*.bin;*.BIN;*.rom;*.ROM;*.hex;*.s19" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\MC10.Core\MC10.Core.csproj" />
   </ItemGroup>

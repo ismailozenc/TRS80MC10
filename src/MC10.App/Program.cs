@@ -39,22 +39,41 @@ namespace MC10.App
         static readonly string[] RomExtensions = { ".bin", ".rom", ".hex", ".ihx", ".s19" };
 
         /// <summary>
-        /// Walks up from the build output folder looking for a <c>roms</c> directory and returns
-        /// the first firmware image in it, or null. Keeps the ROM out of source control.
+        /// Finds a firmware image without command-line arguments (Visual Studio F5). Searches, from the
+        /// build output folder upwards: the folder itself and a <c>roms</c> subfolder. The folder itself is
+        /// only searched when it is the output folder or a project folder (contains a .csproj), so stray
+        /// files in higher-level folders are never picked up. MC10.App.csproj also copies *.bin / *.rom
+        /// from the project folder to the output folder.
         /// </summary>
         static string FindDefaultRom()
         {
             var dir = new DirectoryInfo(AppContext.BaseDirectory);
             for (int depth = 0; depth < 8 && dir != null; depth++, dir = dir.Parent)
             {
-                string roms = Path.Combine(dir.FullName, "roms");
-                if (!Directory.Exists(roms)) continue;
-                foreach (string f in Directory.GetFiles(roms))
+                bool isOutput = depth == 0;
+                bool isProject = dir.GetFiles("*.csproj").Length > 0;
+                if (isOutput || isProject)
                 {
-                    if (Array.IndexOf(RomExtensions, Path.GetExtension(f).ToLowerInvariant()) >= 0)
-                        return f;
+                    string hit = FirstRom(dir.FullName);
+                    if (hit != null) return hit;
+                }
+                string roms = Path.Combine(dir.FullName, "roms");
+                if (Directory.Exists(roms))
+                {
+                    string hit = FirstRom(roms);
+                    if (hit != null) return hit;
                 }
             }
+            return null;
+        }
+
+        static string FirstRom(string folder)
+        {
+            string[] files = Directory.GetFiles(folder);
+            Array.Sort(files, StringComparer.OrdinalIgnoreCase);
+            foreach (string f in files)
+                if (Array.IndexOf(RomExtensions, Path.GetExtension(f).ToLowerInvariant()) >= 0)
+                    return f;
             return null;
         }
     }

@@ -229,11 +229,20 @@ namespace MC10.App
                           (machine.Rom != null ? $"   ROM CRC32 {machine.Rom.Crc32():X8}" : "   no ROM");
         }
 
+        DateTime lastLiveDisasm = DateTime.MinValue;
+
         void RefreshLive()
         {
             if (IsDisposed) return;
             RefreshRegs();
-            status.Text = $"RUNNING   cycles: {machine.Cpu.Cycles:N0}" +
+            // Follow the running PC: re-centre the listing about once a second, only when the PC
+            // has left the instructions currently shown.
+            if (!disasmAddrs.Contains(machine.Cpu.PC) && (DateTime.UtcNow - lastLiveDisasm).TotalSeconds >= 1)
+            {
+                lastLiveDisasm = DateTime.UtcNow;
+                RefreshDisasm();
+            }
+            status.Text = $"RUNNING   PC={machine.Cpu.PC:X4}   cycles: {machine.Cpu.Cycles:N0}" +
                           (machine.Rom != null ? $"   ROM CRC32 {machine.Rom.Crc32():X8}" : "   no ROM");
             runBtn.Text = "Pause (F5)";
         }
