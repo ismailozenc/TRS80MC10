@@ -33,15 +33,35 @@ namespace MC10.Tests
         }
 
         [Fact]
-        public void LowercaseUsesShiftOnPort2()
+        public void LettersNeverUseShift()
         {
             byte strobe = 0x7F;                            // column 7 low
             var k = new MatrixKeyboard(() => strobe);
-            k.TapChar('a');
+            k.TapChar('a');                                // lowercase host letter -> plain key
+            k.Advance();
+            Assert.Equal(0xFF, k.ReadPort2());
+        }
+
+        [Fact]
+        public void ShiftedSymbolUsesShiftOnPort2()
+        {
+            byte strobe = 0x7F;
+            var k = new MatrixKeyboard(() => strobe);
+            k.TapChar('!');                                // SHIFT+1
             k.Advance();
             Assert.Equal(0xFD, k.ReadPort2());             // bit 1 low = shift down
             strobe = 0xFF;
             Assert.Equal(0xFF, k.ReadPort2());
+        }
+
+        [Fact]
+        public void SpaceIsColumn7Row3()
+        {
+            byte strobe = 0x7F;
+            var k = new MatrixKeyboard(() => strobe);
+            k.TapChar(' ');
+            k.Advance();
+            Assert.Equal(0xF7, Rows(k));
         }
 
         [Fact]

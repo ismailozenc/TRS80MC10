@@ -67,8 +67,11 @@ namespace MC10.Core
             if (ch == ' ') { TapIndex(31); return true; }
             if (ch == '\b') { TapIndex(1, false, true); return true; }          // CONTROL+A = backspace (manual)
             if (ch >= 1 && ch <= 26) { TapIndex(ch, false, true); return true; } // Ctrl+letter
-            if (ch >= 'A' && ch <= 'Z') { TapIndex(ch - 'A' + 1); return true; } // all-caps mode: no shift
-            if (ch >= 'a' && ch <= 'z') { TapIndex(ch - 'a' + 1, true); return true; }
+            // The MC-10 powers up in all-caps mode, where SHIFT+letter selects a block-graphics
+            // character (confirmed by running the firmware scan: shift+A returns $89).
+            // So both cases of a host letter send the plain key.
+            if (ch >= 'A' && ch <= 'Z') { TapIndex(ch - 'A' + 1); return true; }
+            if (ch >= 'a' && ch <= 'z') { TapIndex(ch - 'a' + 1); return true; }
             if (ch == '@') { TapIndex(0); return true; }
             if (ch >= '0' && ch <= '7') { TapIndex(32 + ch - '0'); return true; }
             if (ch == '8' || ch == '9') { TapIndex(40 + ch - '8'); return true; }

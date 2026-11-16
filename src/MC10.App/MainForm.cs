@@ -189,7 +189,19 @@ namespace MC10.App
                     e.Handled = e.SuppressKeyPress = true;
                     break;
                 case Keys.Left:                              // arrow acts as backspace (CONTROL+A)
+                case Keys.Back:
                     session.Machine.Keyboard.TapChar('\b');
+                    e.Handled = e.SuppressKeyPress = true;
+                    break;
+                case Keys.Space:                             // handled here so it never depends on KeyPress
+                    if (!e.Control && !e.Alt)
+                    {
+                        session.Machine.Keyboard.TapChar(' ');
+                        e.Handled = e.SuppressKeyPress = true;
+                    }
+                    break;
+                case Keys.Return:
+                    session.Machine.Keyboard.TapChar('\r');
                     e.Handled = e.SuppressKeyPress = true;
                     break;
             }
