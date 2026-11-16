@@ -121,11 +121,13 @@ namespace MC10.App
                 {
                     Cell cell = m.Video.GetCell(r, c);
                     float x = c * cw, y = r * ch;
-                    using (var bg = new SolidBrush(Palette.Get(cell.Background)))
-                        g.FillRectangle(bg, x, y, cw, ch);
-                    using (var fg = new SolidBrush(Palette.Get(cell.Foreground)))
+                    Color back = Palette.Get(cell.Background);
+                    Color front = Palette.Get(cell.Foreground);
+
+                    if (cell.IsSemigraphic)
                     {
-                        if (cell.IsSemigraphic)
+                        using (var bg = new SolidBrush(back)) g.FillRectangle(bg, x, y, cw, ch);
+                        using (var fg = new SolidBrush(front))
                         {
                             float hw = cw / 2, hh = ch / 2;
                             for (int bit = 0; bit < 4; bit++)
@@ -134,10 +136,16 @@ namespace MC10.App
                                 g.FillRectangle(fg, x + (bit % 2) * hw, y + (bit / 2) * hh, hw, hh);
                             }
                         }
-                        else if (cell.Code >= 0x20 && cell.Code <= 0x7E)
-                        {
-                            g.DrawString(((char)cell.Code).ToString(), glyphFont, fg, x + 1, y);
-                        }
+                        continue;
+                    }
+
+                    Video.Glyph(cell.Code, out char glyph, out bool inverse);
+                    if (inverse) { var t = back; back = front; front = t; }   // reverse video
+                    using (var bg = new SolidBrush(back)) g.FillRectangle(bg, x, y, cw, ch);
+                    if (glyph != ' ')
+                    {
+                        using (var fg = new SolidBrush(front))
+                            g.DrawString(glyph.ToString(), glyphFont, fg, x + 1, y);
                     }
                 }
             }

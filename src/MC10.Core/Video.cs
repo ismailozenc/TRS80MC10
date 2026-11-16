@@ -53,12 +53,27 @@ namespace MC10.Core
             return sb.ToString();
         }
 
+        /// <summary>
+        /// Maps a text code to the glyph drawn and whether it is shown in reverse video.
+        /// Per the manual, lowercase letters appear as capitals in reverse video, and $60 is a blank.
+        /// </summary>
+        public static void Glyph(byte code, out char ch, out bool inverse)
+        {
+            inverse = false;
+            ch = ' ';
+            if (code >= 0x80 || code == 0x60) return;          // semigraphics / blank
+            if (code < 0x20) { inverse = true; ch = (char)(code + 0x40); }
+            else if (code < 0x60) ch = (char)code;             // digits, symbols, capitals
+            else if (code <= 0x7A) { inverse = true; ch = (char)(code - 0x20); }
+            else ch = (char)code;                              // $7B-$7F
+        }
+
         /// <summary>Printable character for a code, or a quadrant glyph for block graphics.</summary>
         public static char CharFor(byte code)
         {
-            if (code >= 0x20 && code <= 0x7E) return (char)code;
             if (code >= 0x80) return QuadrantChars[code & 0x0F];
-            return ' ';
+            Glyph(code, out char ch, out _);
+            return ch;
         }
 
         // Index = 4-bit block mask (bit0 TL, bit1 TR, bit2 BL, bit3 BR)
