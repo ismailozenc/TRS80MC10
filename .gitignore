@@ -10,3 +10,6 @@ TestResults/
 *.BIN
 *.rom
 *.ROM
+# firmware lives in roms/ and is never committed
+roms/*
+!roms/README.txt
