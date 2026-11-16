@@ -34,6 +34,8 @@ namespace MC10.Core
         public ushort LastIllegalPc;
         public bool IrqLine;          // external IRQ1 level
         public bool NmiPending;
+        /// <summary>External levels on port 2 (keyboard modifiers etc.); falls back to <see cref="PortIn"/>.</summary>
+        public Func<byte> Port2Read;
 
         public readonly byte[] Io = new byte[32];
         public readonly byte[] PortIn = { 0xFF, 0xFF, 0xFF, 0xFF };
@@ -155,7 +157,8 @@ namespace MC10.Core
                 case P2Dr:
                 {
                     int ddr = Io[r - 2];
-                    return (byte)((Io[r] & ddr) | (PortIn[r - 2] & ~ddr & 0xFF));
+                    int ext = (r == P2Dr && Port2Read != null) ? Port2Read() : PortIn[r - 2];
+                    return (byte)((Io[r] & ddr) | (ext & ~ddr & 0xFF));
                 }
                 case Tcsr1: return Io[Tcsr1];
                 case CntH: return (byte)(Frc >> 8);

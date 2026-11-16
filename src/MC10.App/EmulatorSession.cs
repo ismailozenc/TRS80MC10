@@ -48,6 +48,7 @@ namespace MC10.App
         public void Frame()
         {
             if (!Running) return;
+            Machine.Keyboard.Advance();
             StopReason r = Machine.RunCycles(Math.Max(1000, CyclesPerFrame));
             if (r != StopReason.Budget)
             {

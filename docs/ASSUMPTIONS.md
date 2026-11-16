@@ -30,7 +30,7 @@ the keyboard matrix or the video-chip wiring. The emulator therefore uses these 
 | External RAM | `$4000`-`$4FFF`, 4 KB | Inferred from firmware: variables/vectors at `$4200`-`$42FF`, stack near `$419A`, `LDX $4221`. Internal 6803 registers overlay `$0000`-`$001F`. |
 | Text screen RAM | `$4000`, 512 bytes | **Guess.** Not yet located in the firmware. |
 | ROM window | `$E000`-`$FFFF`, 8 KB (matches the uploaded 8 KB image, whose reset vector `$FFFE` = `$F72E`) | Assumed from the image size and vectors, not from the manual. The 6803 vectors at `$FFF0`-`$FFFF` are architectural. A 16 KB layout is still possible via config. |
-| Keyboard | `$8000` data, `$8001` status (queue model) | **Placeholder.** The real MC-10 keyboard is scanned through a matrix. |
+| Keyboard | 8 columns strobed via port 1 (active low), 6 rows read from `$BFFF` bits 0-5 (active low); key index = row*8+col (0-26 `@A-Z`, 30 ENTER, 31 SPACE, 32-39 `0-7`, 40-47 `8 9 : ; , - . /`) | **Derived from the firmware scan routine** (`$F8A1`-`$F8F3`) and its translation tables. Shift/Ctrl/Break on port 2 bit 1 with column 7/2/0 strobed is an inference; keys 27-29 (unidentified) are not mapped. |
 | Sound register | `$8002` | **Placeholder.** The frequency mapping is not implemented; the events are recorded for inspection. |
 | Video control register | `$8003` (bits 0-3 background, 4-7 text colour) | **Placeholder.** |
 | Semigraphics | Codes `$80`-`$FF`: bits 0-3 select the four 2x2 blocks | Assumed layout. The character-generator ROM is not emulated; printable codes use the system monospace font. |

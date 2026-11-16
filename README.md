@@ -6,7 +6,7 @@ A Motorola 6803 based MC-10 emulator for Windows, with:
 - **EPROM**: read-only ROM or byte-programmable (EEPROM-style) chip, with CRC-32 and checksum. Loads raw `.bin`/`.rom`, Intel HEX (`.hex`), and Motorola S-record (`.s19`).
 - **RAM and memory map**: configurable through a JSON file.
 - **Screen**: 32 x 16 text with the nine MC-10 colours and 2x2 block graphics.
-- **Keyboard**: keystrokes go into a queue that firmware reads, with BREAK on Esc.
+- **Keyboard**: a real key matrix (port 1 strobe, rows on `$BFFF`); host characters are replayed as timed key taps. Esc = BREAK, Backspace/Left = CONTROL+A.
 - **Sound**: each write is recorded (cycle and pitch) for inspection.
 - **Debugger**: disassembly with breakpoints, single-step and step-over, run-to-cursor, registers and flags, hex memory with poke, write-watchpoints, instruction history, and a **trace log to file**.
 - **Tests**: xUnit tests for flag rules, stack and interrupt sequencing, watchpoints, breakpoints, EPROM policy and image loaders.

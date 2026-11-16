@@ -14,7 +14,7 @@ namespace MC10.App
         const int Scale = 2;                         // on-screen zoom
 
         readonly EmulatorSession session;
-        readonly Panel screen;
+        readonly ScreenPanel screen;
         readonly StatusStrip status;
         readonly ToolStripStatusLabel stateLabel, cycleLabel, romLabel;
         readonly Timer frameTimer;
@@ -65,7 +65,7 @@ namespace MC10.App
             Controls.Add(menu);
 
             // ---- screen
-            screen = new Panel
+            screen = new ScreenPanel
             {
                 Dock = DockStyle.Fill,
                 BackColor = Color.Black,
@@ -86,7 +86,7 @@ namespace MC10.App
             frameTimer.Tick += (s, e) =>
             {
                 session.Frame();
-                screen.Invalidate();
+                if (ScreenChanged(machine)) screen.Invalidate();
                 if (session.Running) UpdateStatus();
             };
             frameTimer.Start();
@@ -99,6 +99,21 @@ namespace MC10.App
             FormClosing += (s, e) => { frameTimer.Stop(); StopTrace(); debugger?.Close(); };
 
             UpdateStatus();
+        }
+
+        // Repaint only when video RAM or the colour register changed (avoids flicker and wasted work).
+        readonly byte[] lastScreen = new byte[Video.Columns * Video.Rows + 1];
+        bool ScreenChanged(Machine m)
+        {
+            bool changed = false;
+            int n = Video.Columns * Video.Rows;
+            for (int i = 0; i < n; i++)
+            {
+                byte v = m.Bus.Mem[m.Config.VideoBase + i];
+                if (lastScreen[i] != v) { lastScreen[i] = v; changed = true; }
+            }
+            if (lastScreen[n] != m.VideoControl.Value) { lastScreen[n] = m.VideoControl.Value; changed = true; }
+            return changed;
         }
 
         // ------------------------------------------------------------ painting
@@ -162,23 +177,21 @@ namespace MC10.App
         // ------------------------------------------------------------ input
         void HandleKeyPress(KeyPressEventArgs e)
         {
-            char ch = e.KeyChar;
-            byte code;
-            if (ch == '\r') code = 13;                       // ENTER
-            else if (ch == '\b') code = 8;                   // backspace
-            else if (ch == (char)27) code = 3;               // ESC = BREAK
-            else if (ch >= 32 && ch < 127) code = (byte)char.ToUpperInvariant(ch);
-            else return;
-            session.Machine.Press(code);
-            e.Handled = true;
+            if (session.Machine.Keyboard.TapChar(e.KeyChar)) e.Handled = true;
         }
 
         void HandleKeyDown(KeyEventArgs e)
         {
-            if (e.KeyCode == Keys.Left)
+            switch (e.KeyCode)
             {
-                session.Machine.Press(8);                    // left arrow acts as backspace
-                e.Handled = true;
+                case Keys.Escape:                            // BREAK
+                    session.Machine.Keyboard.TapBreak();
+                    e.Handled = e.SuppressKeyPress = true;
+                    break;
+                case Keys.Left:                              // arrow acts as backspace (CONTROL+A)
+                    session.Machine.Keyboard.TapChar('\b');
+                    e.Handled = e.SuppressKeyPress = true;
+                    break;
             }
         }
 
@@ -263,11 +276,24 @@ namespace MC10.App
         void UpdateStatus()
         {
             var cpu = session.Machine.Cpu;
-            stateLabel.Text = session.Running ? "running" :
+            string st = session.Running ? "running" :
                               session.LastStop == StopReason.None ? "paused" : $"stopped: {session.LastStop}";
-            cycleLabel.Text = $"PC={cpu.PC:X4}  cycles={cpu.Cycles:N0}" + (traceWriter != null ? "  TRACE" : "");
+            if (stateLabel.Text != st) stateLabel.Text = st;
+            string cy = $"PC={cpu.PC:X4}  cycles={cpu.Cycles:N0}" + (traceWriter != null ? "  TRACE" : "");
+            if (cycleLabel.Text != cy) cycleLabel.Text = cy;
         }
 
+    }
+
+    /// <summary>Panel with double buffering so repaints do not flicker.</summary>
+    internal sealed class ScreenPanel : Panel
+    {
+        public ScreenPanel()
+        {
+            SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint |
+                     ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
+            DoubleBuffered = true;
+        }
     }
 
     /// <summary>Nine MC-10 colours, indexed as in the manual's CLS colour codes.</summary>

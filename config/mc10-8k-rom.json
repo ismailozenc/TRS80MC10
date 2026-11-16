@@ -8,8 +8,6 @@
   "RomBase": 57344,
   "RomSize": 8192,
   "RomMode": "ReadOnly",
-  "KeyboardData": 32768,
-  "KeyboardStatus": 32769,
   "SoundRegister": 32770,
   "InternalRamBase": 64,
   "InternalRamSize": 192,

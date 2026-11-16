@@ -32,7 +32,7 @@ namespace MC10.Core
         public Cpu6803 Cpu { get; }
         public Eprom Rom { get; private set; }
         public Video Video { get; }
-        public KeyboardDevice Keyboard { get; }
+        public MatrixKeyboard Keyboard { get; }
         public SoundDevice Sound { get; }
         public VideoControlDevice VideoControl { get; }
 
@@ -56,10 +56,10 @@ namespace MC10.Core
             Cpu = new Cpu6803(Bus);
             // Cycle count is read through a delegate so devices stay independent of the CPU.
             Sound = new SoundDevice(() => Cpu.Cycles);
-            Keyboard = new KeyboardDevice((ushort)Config.KeyboardData, (ushort)Config.KeyboardStatus);
+            Keyboard = new MatrixKeyboard(() => Cpu.Io[2]);
+            Cpu.Port2Read = Keyboard.ReadPort2;
             VideoControl = new VideoControlDevice();
-            Bus.MapDevice((ushort)Config.KeyboardData, Keyboard);
-            Bus.MapDevice((ushort)Config.KeyboardStatus, Keyboard);
+            Bus.MapDevice(0xBFFF, Keyboard);
             Bus.MapDevice((ushort)Config.SoundRegister, Sound);
             Bus.MapDevice((ushort)Config.VideoControl, VideoControl);
             Video = new Video(Bus, Config.VideoBase, VideoControl);
@@ -77,7 +77,7 @@ namespace MC10.Core
         public void LoadRom(List<ImageLoader.Segment> segments, EpromMode? mode = null)
         {
             int romEnd = Config.RomBase + Config.RomSize;
-            foreach (int dev in new[] { Config.KeyboardData, Config.KeyboardStatus, Config.SoundRegister, Config.VideoControl })
+            foreach (int dev in new[] { Config.SoundRegister, Config.VideoControl })
                 if (dev >= Config.RomBase && dev < romEnd)
                     throw new InvalidOperationException(
                         $"Device address ${dev:X4} lies inside the ROM window ${Config.RomBase:X4}-${romEnd - 1:X4}. Change the config.");
@@ -224,6 +224,5 @@ namespace MC10.Core
 
         public IReadOnlyCollection<HistoryEntry> History => history;
 
-        public void Press(byte asciiCode) => Keyboard.Press(asciiCode);
     }
 }

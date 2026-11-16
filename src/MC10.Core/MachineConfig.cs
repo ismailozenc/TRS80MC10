@@ -30,9 +30,9 @@ namespace MC10.Core
         public int RomSize { get; set; } = 0x2000;        // 8 KB image at the top of memory (reset vector $FFFE)
         public EpromMode RomMode { get; set; } = EpromMode.ReadOnly;
 
-        // Placeholder device addresses. They must lie outside the ROM window (checked by Machine.LoadRom).
-        public int KeyboardData { get; set; } = 0x8000;
-        public int KeyboardStatus { get; set; } = 0x8001;
+        // Placeholder device addresses (sound/video are not yet located in the firmware).
+        // They must lie outside the ROM window (checked by Machine.LoadRom).
+        // The keyboard is not configurable: it is read through $BFFF and ports 1/2.
         public int SoundRegister { get; set; } = 0x8002;
         public int VideoControl { get; set; } = 0x8003;
 

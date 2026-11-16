@@ -4,38 +4,117 @@ using System.Collections.Generic;
 namespace MC10.Core
 {
     /// <summary>
-    /// Keyboard model: a FIFO of ASCII codes. Reading the data address pops one code;
-    /// reading the status address returns bit 0 = data ready. This is an abstraction
-    /// (the real MC-10 keyboard is scanned through a matrix); see docs/ASSUMPTIONS.md.
+    /// MC-10 keyboard matrix, derived from the firmware's scan routine at $F8A1-$F8F3:
+    /// the CPU writes a column strobe to port 1 (bit n low selects column n, 8 columns) and reads the
+    /// six row lines from $BFFF (bits 0-5, active low). Key index = row*8 + column:
+    ///   0-26 @ A-Z, 30 ENTER, 31 SPACE, 32-39 0-7, 40-47 8 9 : ; , - . /
+    /// Shift, Ctrl and Break arrive on port 2 bit 1 while column 7, 2 or 0 is strobed (inferred from
+    /// the firmware; see docs/ASSUMPTIONS.md). Host keystrokes are queued as timed "taps" so the
+    /// firmware's edge-detecting scan always sees a press and a release.
     /// </summary>
-    public sealed class KeyboardDevice : IDevice
+    public sealed class MatrixKeyboard : IDevice
     {
-        readonly Queue<byte> fifo = new Queue<byte>();
-        readonly ushort dataAddr, statusAddr;
+        public const int HoldFrames = 4, GapFrames = 3;
 
-        public KeyboardDevice(ushort dataAddr, ushort statusAddr)
-        {
-            this.dataAddr = dataAddr;
-            this.statusAddr = statusAddr;
-        }
+        readonly Func<byte> strobe;                    // current port 1 output
+        readonly byte[] cols = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
+        bool shift, ctrl, brk;
+        readonly Queue<Tap> queue = new Queue<Tap>();
+        Tap? active;
+        int frames;
+        bool holding;
 
-        public int Pending => fifo.Count;
+        struct Tap { public int Index; public bool Shift, Ctrl, Break; }
 
-        public void Press(byte code)
-        {
-            if (fifo.Count < 64) fifo.Enqueue(code);   // drop keystrokes if the buffer is full
-        }
+        public MatrixKeyboard(Func<byte> port1Strobe) { strobe = port1Strobe; }
 
-        public void Clear() => fifo.Clear();
+        public int Pending => queue.Count + (active.HasValue ? 1 : 0);
 
         public byte Read(ushort addr)
         {
-            if (addr == statusAddr) return (byte)(fifo.Count > 0 ? 0x01 : 0x00);
-            if (addr == dataAddr) return fifo.Count > 0 ? fifo.Dequeue() : (byte)0;
-            return 0xFF;
+            byte s = strobe();
+            byte rows = 0xFF;
+            for (int c = 0; c < 8; c++)
+                if (((s >> c) & 1) == 0) rows &= cols[c];
+            return rows;
         }
 
-        public void Write(ushort addr, byte value) { }
+        public void Write(ushort addr, byte value) { }   // $BFFF writes: VDG/sound latch (not modelled)
+
+        /// <summary>External levels on port 2: bit 1 low when a modifier on the strobed column is down.</summary>
+        public byte ReadPort2()
+        {
+            byte s = strobe();
+            bool low = (((s >> 7) & 1) == 0 && shift) || (((s >> 2) & 1) == 0 && ctrl) || ((s & 1) == 0 && brk);
+            return low ? (byte)0xFD : (byte)0xFF;
+        }
+
+        /// <summary>Queue a key by matrix index (0-47) with optional modifiers.</summary>
+        public void TapIndex(int index, bool withShift = false, bool withCtrl = false)
+        {
+            if (queue.Count < 32) queue.Enqueue(new Tap { Index = index, Shift = withShift, Ctrl = withCtrl });
+        }
+
+        public void TapBreak()
+        {
+            if (queue.Count < 32) queue.Enqueue(new Tap { Index = -1, Break = true });
+        }
+
+        /// <summary>Queue the key(s) that produce a host character. Returns false if there is none.</summary>
+        public bool TapChar(char ch)
+        {
+            if (ch == '\r') { TapIndex(30); return true; }
+            if (ch == ' ') { TapIndex(31); return true; }
+            if (ch == '\b') { TapIndex(1, false, true); return true; }          // CONTROL+A = backspace (manual)
+            if (ch >= 1 && ch <= 26) { TapIndex(ch, false, true); return true; } // Ctrl+letter
+            if (ch >= 'A' && ch <= 'Z') { TapIndex(ch - 'A' + 1); return true; } // all-caps mode: no shift
+            if (ch >= 'a' && ch <= 'z') { TapIndex(ch - 'a' + 1, true); return true; }
+            if (ch == '@') { TapIndex(0); return true; }
+            if (ch >= '0' && ch <= '7') { TapIndex(32 + ch - '0'); return true; }
+            if (ch == '8' || ch == '9') { TapIndex(40 + ch - '8'); return true; }
+            int shifted = "!\"#$%&'()*+<=>?".IndexOf(ch);       // shifted 1-9 then punctuation
+            if (shifted >= 0) { TapIndex(33 + shifted, true); return true; }
+            int plain = ":;,-./".IndexOf(ch);
+            if (plain >= 0) { TapIndex(42 + plain); return true; }
+            return false;
+        }
+
+        /// <summary>Called once per display frame: advances the tap state machine.</summary>
+        public void Advance()
+        {
+            if (frames > 0) frames--;
+            if (frames > 0) return;
+            if (holding)
+            {
+                Release();
+                holding = false;
+                frames = GapFrames;
+                return;
+            }
+            if (queue.Count == 0) { active = null; return; }
+            Tap t = queue.Dequeue();
+            active = t;
+            Press(t);
+            holding = true;
+            frames = HoldFrames;
+        }
+
+        void Press(Tap t)
+        {
+            shift = t.Shift; ctrl = t.Ctrl; brk = t.Break;
+            if (t.Index >= 0) cols[t.Index & 7] &= (byte)~(1 << (t.Index >> 3));
+        }
+
+        void Release()
+        {
+            for (int c = 0; c < 8; c++) cols[c] = 0xFF;
+            shift = ctrl = brk = false;
+        }
+
+        public void Clear()
+        {
+            queue.Clear(); active = null; holding = false; frames = 0; Release();
+        }
     }
 
     /// <summary>

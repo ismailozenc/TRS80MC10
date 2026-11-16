@@ -116,8 +116,10 @@ namespace MC10.App
             // Dock order: the fill control must come last among docked children.
             disasm.BringToFront();
 
-            refresh = new Timer { Interval = 150 };
-            refresh.Tick += (s, e) => RefreshAll();
+            refresh = new Timer { Interval = 250 };
+            // While running, only light-weight panes refresh; the full redraw (which rebuilds the
+            // disassembly list and causes flicker) happens when paused or stepping.
+            refresh.Tick += (s, e) => { if (session.Running) RefreshLive(); else RefreshAll(); };
             refresh.Start();
 
             KeyDown += (s, e) => HandleKey(e);
@@ -227,6 +229,15 @@ namespace MC10.App
                           (machine.Rom != null ? $"   ROM CRC32 {machine.Rom.Crc32():X8}" : "   no ROM");
         }
 
+        void RefreshLive()
+        {
+            if (IsDisposed) return;
+            RefreshRegs();
+            status.Text = $"RUNNING   cycles: {machine.Cpu.Cycles:N0}" +
+                          (machine.Rom != null ? $"   ROM CRC32 {machine.Rom.Crc32():X8}" : "   no ROM");
+            runBtn.Text = "Pause (F5)";
+        }
+
         void RefreshDisasm()
         {
             ushort pc = machine.Cpu.PC;
@@ -266,7 +277,8 @@ namespace MC10.App
             sb.AppendLine($"illegal opcodes {c.IllegalCount}" + (c.IllegalCount > 0 ? $" (last at {c.LastIllegalPc:X4})" : ""));
             sb.AppendLine($"halted (WAI) {c.Halted}   NMI pending {c.NmiPending}   IRQ line {c.IrqLine}");
             sb.AppendLine($"timer FRC {c.Frc:X4}  OCR {c.Ocr:X4}  TCSR1 {c.Io[8]:X2}");
-            regs.Text = sb.ToString();
+            string t = sb.ToString();
+            if (regs.Text != t) regs.Text = t;
         }
 
         static string Bit(byte v, int mask) => (v & mask) != 0 ? "1" : "0";
@@ -287,7 +299,8 @@ namespace MC10.App
                 }
                 sb.Append(' ').Append(ascii).AppendLine();
             }
-            memory.Text = sb.ToString();
+            string mt = sb.ToString();
+            if (memory.Text != mt) memory.Text = mt;
         }
 
         void RefreshHistory()
