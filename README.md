@@ -81,13 +81,13 @@ Trace files grow fast at full speed. Use **Machine > Speed** to slow the machine
 - Not yet implemented: cassette (CSAVE/CLOAD) tape interface, RS-232 serial, sound frequency mapping and WAV export, a character-generator ROM for exact glyphs, save/load of machine state, and a built-in assembler. These are good next additions.
 - Timing is instruction-level. Cycle counts are approximate and do not model bus timing or video-raster timing.
 
-## Running an 8 KB firmware image
+## Running the firmware
 
-`config/mc10-8k-rom.json` maps an 8 KB ROM at `$E000`–`$FFFF`, which is where the image's reset vector
-(`$FFFE`) points. Keep your dump outside the repo (ROM files are git-ignored) and run:
+The defaults now match an 8 KB ROM at `$E000`–`$FFFF`. Keep your dump outside the repo (ROM files are git-ignored) and run:
 
 ```powershell
-dotnet run --project src\MC10.App -- --config config\mc10-8k-rom.json --rom C:\path\to\your-mc10.bin
+dotnet run --project src\MC10.App -- --rom C:\path\to\your-mc10.bin
 ```
 
-The keyboard, sound and video-control addresses in that file are still the placeholders listed in `docs/ASSUMPTIONS.md`.
+`config/mc10-8k-rom.json` contains the same values for reference, and you can pass it with `--config`.
+The keyboard, sound and video-control addresses are still placeholders listed in `docs/ASSUMPTIONS.md`.

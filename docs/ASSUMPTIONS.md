@@ -28,10 +28,10 @@ the keyboard matrix or the video-chip wiring. The emulator therefore uses these 
 | Clock | 894886 Hz | Assumed (about 0.89 MHz) |
 | RAM | `$0000`-`$0FFF` | Assumed. Internal 6803 registers overlay `$0000`-`$001F`. |
 | Text screen RAM | `$0400`, 512 bytes | Assumed |
-| ROM window | `$C000`-`$FFFF`, 16 KB | Assumed. The 6803 reset/interrupt vectors at `$FFF0`-`$FFFF` are architectural and are correct for any 6803 system. |
-| Keyboard | `$E000` data, `$E001` status (queue model) | **Placeholder.** The real MC-10 keyboard is scanned through a matrix. |
-| Sound register | `$E002` | **Placeholder.** The frequency mapping is not implemented; the events are recorded for inspection. |
-| Video control register | `$E003` (bits 0-3 background, 4-7 text colour) | **Placeholder.** |
+| ROM window | `$E000`-`$FFFF`, 8 KB (matches the uploaded 8 KB image, whose reset vector `$FFFE` = `$F72E`) | Assumed from the image size and vectors, not from the manual. The 6803 vectors at `$FFF0`-`$FFFF` are architectural. A 16 KB layout is still possible via config. |
+| Keyboard | `$8000` data, `$8001` status (queue model) | **Placeholder.** The real MC-10 keyboard is scanned through a matrix. |
+| Sound register | `$8002` | **Placeholder.** The frequency mapping is not implemented; the events are recorded for inspection. |
+| Video control register | `$8003` (bits 0-3 background, 4-7 text colour) | **Placeholder.** |
 | Semigraphics | Codes `$80`-`$FF`: bits 0-3 select the four 2x2 blocks | Assumed layout. The character-generator ROM is not emulated; printable codes use the system monospace font. |
 
 Replace the placeholders by editing the JSON config (`MachineConfig.Save` writes the defaults) once the

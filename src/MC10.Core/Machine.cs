@@ -75,6 +75,12 @@ namespace MC10.Core
         /// <summary>Install a ROM image covering the configured window. Segments outside the window are ignored.</summary>
         public void LoadRom(List<ImageLoader.Segment> segments, EpromMode? mode = null)
         {
+            int romEnd = Config.RomBase + Config.RomSize;
+            foreach (int dev in new[] { Config.KeyboardData, Config.KeyboardStatus, Config.SoundRegister, Config.VideoControl })
+                if (dev >= Config.RomBase && dev < romEnd)
+                    throw new InvalidOperationException(
+                        $"Device address ${dev:X4} lies inside the ROM window ${Config.RomBase:X4}-${romEnd - 1:X4}. Change the config.");
+
             byte[] image = ImageLoader.Flatten(segments, Config.RomBase, Config.RomSize);
             Rom = new Eprom(Config.RomBase, image, mode ?? Config.RomMode);
             Bus.MapRom(Rom);

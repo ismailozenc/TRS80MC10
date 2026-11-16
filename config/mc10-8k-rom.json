@@ -8,8 +8,8 @@
   "RomBase": 57344,
   "RomSize": 8192,
   "RomMode": "ReadOnly",
-  "KeyboardData": 57344,
-  "KeyboardStatus": 57345,
-  "SoundRegister": 57346,
-  "VideoControl": 57347
+  "KeyboardData": 32768,
+  "KeyboardStatus": 32769,
+  "SoundRegister": 32770,
+  "VideoControl": 32771
 }

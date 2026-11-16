@@ -21,14 +21,15 @@ namespace MC10.Core
         public int Columns { get; set; } = 32;            // from the manual
         public int Rows { get; set; } = 16;               // 32 x 16 = 512 print positions (manual)
 
-        public int RomBase { get; set; } = 0xC000;
-        public int RomSize { get; set; } = 0x4000;        // 16 KB window, top of memory
+        public int RomBase { get; set; } = 0xE000;
+        public int RomSize { get; set; } = 0x2000;        // 8 KB image at the top of memory (reset vector $FFFE)
         public EpromMode RomMode { get; set; } = EpromMode.ReadOnly;
 
-        public int KeyboardData { get; set; } = 0xE000;   // placeholder device addresses
-        public int KeyboardStatus { get; set; } = 0xE001;
-        public int SoundRegister { get; set; } = 0xE002;
-        public int VideoControl { get; set; } = 0xE003;
+        // Placeholder device addresses. They must lie outside the ROM window (checked by Machine.LoadRom).
+        public int KeyboardData { get; set; } = 0x8000;
+        public int KeyboardStatus { get; set; } = 0x8001;
+        public int SoundRegister { get; set; } = 0x8002;
+        public int VideoControl { get; set; } = 0x8003;
 
         public static MachineConfig Default() => new MachineConfig();
 
