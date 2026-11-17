@@ -181,6 +181,7 @@ namespace MC10.App
 
             KeyDown += (s, e) => HandleKey(e);
             FormClosing += (s, e) => refresh.Stop();
+            Shown += (s, e) => RefreshAll();        // listings only build when visible
             RefreshAll();
         }
 
@@ -302,7 +303,9 @@ namespace MC10.App
                 RefreshSideTab();
                 runBtn.Text = session.Running ? "Pause (F5)" : "Run (F5)";
                 string where = machine.DescribeAddress(machine.Cpu.PC);
-                string stop = machine.LastStop == StopReason.Watchpoint ? $"write to ${machine.LastWatchAddress:X4}" : machine.LastStop.ToString();
+                string stop = machine.LastStop == StopReason.Watchpoint ? $"write to ${machine.LastWatchAddress:X4}"
+                            : machine.LastStop == StopReason.Budget || machine.LastStop == StopReason.Reached ? "none"
+                            : machine.LastStop.ToString();
                 status.Text = $"{(session.Running ? "RUNNING" : "paused")}   PC={machine.Cpu.PC:X4}" + (where != null ? $" {where}" : "") +
                               $"   last stop: {stop}   cycles: {machine.Cpu.Cycles:N0}" +
                               (machine.Rom != null ? $"   ROM CRC32 {machine.Rom.Crc32():X8}" : "   no ROM");

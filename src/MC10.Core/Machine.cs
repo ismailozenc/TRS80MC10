@@ -531,13 +531,17 @@ namespace MC10.Core
                     history.Enqueue(new HistoryEntry(cycleBefore, pc, a, b, x, sp, cc, opcode, op1, op2));
                     while (history.Count > HistoryLimit) history.Dequeue();
                 }
+                // Call depth is only used to indent the trace. BASIC often abandons return addresses by
+                // reloading the stack pointer (errors, back to the OK prompt), so that resets the depth.
                 if (opcode == 0x8D || opcode == 0xAD || opcode == 0x9D || opcode == 0xBD) callDepth++;
                 else if ((opcode == 0x39 || opcode == 0x3B) && callDepth > 0) callDepth--;
+                else if (opcode == 0x35 || opcode == 0x8E || opcode == 0x9E || opcode == 0xAE || opcode == 0xBE) callDepth = 0;
             }
-            else if (Trace != null && Cpu.PC != pc)
+            else if (Cpu.PC != pc)
             {
-                Trace.WriteLine($"{pc:X4}  ; interrupt taken -> {Cpu.PC:X4} {SymbolFor(Cpu.PC)}");
+                // The CPU took an interrupt instead of running the instruction at pc.
                 callDepth++;
+                if (Trace != null) Trace.WriteLine($"{pc:X4}  ; interrupt taken -> {Cpu.PC:X4} {SymbolFor(Cpu.PC)}");
             }
 
             if (Cpu.IllegalCount != illegalBefore) LastStop = StopReason.IllegalOpcode;

@@ -115,32 +115,39 @@ namespace MC10.App
             parent.Controls.Add(b);
         }
 
+        static void AddMenuItem(ContextMenuStrip menu, string text, string keys, EventHandler click)
+        {
+            var item = new ToolStripMenuItem(text, null, click);
+            if (keys != null) item.ShortcutKeyDisplayString = keys;
+            menu.Items.Add(item);
+        }
+
         ContextMenuStrip BuildMenu()
         {
             var menu = new ContextMenuStrip();
-            menu.Items.Add("Toggle breakpoint\tCtrl+B", null, (s, e) => ToggleBreakpointAtSelection());
-            menu.Items.Add("Breakpoint condition...", null, (s, e) => EditCondition());
-            menu.Items.Add("Run to this line", null, (s, e) =>
+            AddMenuItem(menu, "Toggle breakpoint", "Ctrl+B", (s, e) => ToggleBreakpointAtSelection());
+            AddMenuItem(menu, "Breakpoint condition...", null, (s, e) => EditCondition());
+            AddMenuItem(menu, "Run to this line", null, (s, e) =>
             {
                 ushort? a = SelectedAddress();
                 if (a.HasValue) RunToRequested?.Invoke(a.Value);
             });
-            menu.Items.Add("Set next instruction (PC) here", null, (s, e) =>
+            AddMenuItem(menu, "Set next instruction (PC) here", null, (s, e) =>
             {
-                ushort? a = SelectedAddress();
-                if (!a.HasValue) return;
-                machine.Cpu.PC = a.Value;
+                ListingLine l = SelectedLine;
+                if (l == null || l.Kind != LineKind.Code) return;
+                machine.Cpu.PC = l.Address;
                 ListingChanged?.Invoke();
             });
             menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add("Follow jump / call / table target\tEnter", null, (s, e) => FollowTarget());
-            menu.Items.Add("Back\tBackspace", null, (s, e) => Back());
-            menu.Items.Add("Rename label...\tF2", null, (s, e) => RenameAtSelection());
-            menu.Items.Add("Show references...\tShift+F12", null, (s, e) => ShowReferences());
+            AddMenuItem(menu, "Follow jump / call / table target", "Enter", (s, e) => FollowTarget());
+            AddMenuItem(menu, "Back", "Backspace", (s, e) => Back());
+            AddMenuItem(menu, "Rename label...", "F2", (s, e) => RenameAtSelection());
+            AddMenuItem(menu, "Show references...", "Shift+F12", (s, e) => ShowReferences());
             menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add("Find...\tCtrl+F", null, (s, e) => Find(false));
-            menu.Items.Add("Find next\tF3", null, (s, e) => Find(true));
-            menu.Items.Add("Copy line\tCtrl+C", null, (s, e) => CopySelectedLine());
+            AddMenuItem(menu, "Find...", "Ctrl+F", (s, e) => Find(false));
+            AddMenuItem(menu, "Find next", "F3", (s, e) => Find(true));
+            AddMenuItem(menu, "Copy line", "Ctrl+C", (s, e) => CopySelectedLine());
             return menu;
         }
 
@@ -369,7 +376,7 @@ namespace MC10.App
         public void ToggleBreakpointAtSelection()
         {
             ListingLine l = SelectedLine;
-            if (l == null || l.Kind == LineKind.Header || l.Kind == LineKind.Blank) return;
+            if (l == null || l.Kind == LineKind.Header || l.Kind == LineKind.Blank || l.Kind == LineKind.Data) return;
             machine.ToggleBreakpoint(l.Address);
             list.Invalidate();
             ListingChanged?.Invoke();

@@ -67,7 +67,7 @@ namespace MC10.App
             mach.DropDownItems.Add(speed);
 
             var programs = new ToolStripMenuItem("&Programs");
-            programs.DropDownItems.Add(Item("&Sample programs...  (F4)", Keys.F4, (s, e) => ShowSamples()));
+            programs.DropDownItems.Add(Item("&Sample programs...", Keys.F4, (s, e) => ShowSamples()));
             programs.DropDownItems.Add(Item("&Paste text as keystrokes  (Ctrl+V)", Keys.None, (s, e) => PasteText()));
             programs.DropDownItems.Add(Item("&Type BASIC file into the keyboard...", Keys.None, (s, e) => TypeBasicFile()));
             programs.DropDownItems.Add(Item("&Cancel typing", Keys.None, (s, e) => session.Machine.Keyboard.Clear()));
@@ -392,7 +392,8 @@ namespace MC10.App
         {
             var cpu = session.Machine.Cpu;
             string st = session.Running ? "running" :
-                              session.LastStop == StopReason.None ? "paused" : $"stopped: {session.LastStop}";
+                              session.LastStop == StopReason.None || session.LastStop == StopReason.Budget ||
+                              session.LastStop == StopReason.Reached ? "paused" : $"stopped: {session.LastStop}";
             if (stateLabel.Text != st) stateLabel.Text = st;
             string cy = $"PC={cpu.PC:X4}  cycles={cpu.Cycles:N0}" + (traceWriter != null ? "  TRACE" : "");
             if (cycleLabel.Text != cy) cycleLabel.Text = cy;

@@ -7,9 +7,11 @@ namespace MC10.Tests
     public class CpuTests
     {
         // Fresh machine with an empty (all $FF) ROM. Code is poked into RAM at $0100.
+        // The real MC-10 has no memory at $0100-$0FFF, so the tests map some there.
         static Machine NewMachine()
         {
             var m = new Machine();
+            m.Bus.MapRam(0x0100, 0x0F00);
             m.LoadRom(new List<ImageLoader.Segment>());
             return m;
         }
