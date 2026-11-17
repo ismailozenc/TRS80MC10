@@ -19,8 +19,11 @@ namespace MC10.Core
     /// <summary>Turns an <see cref="Analysis"/> into an annotated assembly listing.</summary>
     public static class Listing
     {
+        /// <param name="userLabels">Hand-made or loaded names; they replace the automatic label at that address.</param>
+        /// <param name="describe">Optional "routine+offset" naming for the addresses that call or reference a label.</param>
         public static List<ListingLine> Build(Analysis an, Func<ushort, string> symbol, Func<ushort, string> immSymbol,
-                                              string title)
+                                              string title, IReadOnlyDictionary<ushort, string> userLabels = null,
+                                              Func<ushort, string> describe = null)
         {
             var lines = new List<ListingLine>();
             ushort first = (ushort)an.Base;
@@ -39,7 +42,7 @@ namespace MC10.Core
             while (addr < end)
             {
                 ushort ad = (ushort)addr;
-                AddLabel(an, lines, ad);
+                AddLabel(an, lines, ad, userLabels, describe);
 
                 if (an.CodeStart[addr - an.Base])
                 {
@@ -100,33 +103,41 @@ namespace MC10.Core
             return lines;
         }
 
-        static void AddLabel(Analysis an, List<ListingLine> lines, ushort ad)
+        static void AddLabel(Analysis an, List<ListingLine> lines, ushort ad,
+                             IReadOnlyDictionary<ushort, string> user, Func<ushort, string> describe)
         {
-            if (!an.Labels.TryGetValue(ad, out string name)) return;
+            string name = null;
+            bool hasUser = user != null && user.TryGetValue(ad, out name);
+            if (!hasUser && !an.Labels.TryGetValue(ad, out name)) return;
+            bool namedRoutine = hasUser && !name.StartsWith("loc_") && !name.StartsWith("data_");
             bool big = an.Subroutines.Contains(ad) || name == "reset" || name.EndsWith("_isr") || name.StartsWith("tbl_")
-                       || name.StartsWith("fn_");
+                       || name.StartsWith("fn_") || namedRoutine;
             if (big)
             {
                 lines.Add(new ListingLine(ad, LineKind.Blank, ""));
                 lines.Add(new ListingLine(ad, LineKind.Comment, "; " + new string('=', 60)));
-                string how = Describe(an, ad);
+                string how = Describe(an, ad, describe);
                 if (how.Length > 0) lines.Add(new ListingLine(ad, LineKind.Comment, "; " + how));
             }
             string tail = !big && an.Refs.TryGetValue(ad, out var r) ? "   ; from " + Join(r, 4) : "";
             lines.Add(new ListingLine(ad, LineKind.Label, name + ":" + tail));
         }
 
-        static string Describe(Analysis an, ushort ad)
+        static string Describe(Analysis an, ushort ad, Func<ushort, string> describe)
         {
             var parts = new List<string>();
-            if (an.Callers.TryGetValue(ad, out var c)) parts.Add("called from " + Join(c, 8));
-            if (an.Refs.TryGetValue(ad, out var r)) parts.Add("referenced from " + Join(r, 6));
+            if (an.Callers.TryGetValue(ad, out var c)) parts.Add("called from " + Join(c, 8, describe));
+            if (an.Refs.TryGetValue(ad, out var r)) parts.Add("referenced from " + Join(r, 6, describe));
             return string.Join("; ", parts);
         }
 
-        static string Join(List<ushort> list, int max)
+        static string Join(List<ushort> list, int max, Func<ushort, string> describe = null)
         {
-            var s = list.OrderBy(a => a).Take(max).Select(a => a.ToString("X4"));
+            var s = list.OrderBy(a => a).Take(max).Select(a =>
+            {
+                string d = describe?.Invoke(a);
+                return d == null ? a.ToString("X4") : a.ToString("X4") + " (" + d + ")";
+            });
             string text = string.Join(", ", s);
             return list.Count > max ? text + $" (+{list.Count - max} more)" : text;
         }

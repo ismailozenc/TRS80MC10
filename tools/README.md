@@ -20,5 +20,10 @@ and **Analysis > Re-analyse ROM using run data** folds the observed call targets
 
 Older exploration scripts (usage: `python tools/<script> MC10.BIN`):
 
-* `mc10_dis.py` – quick standalone 6803 disassembler of the ROM.
+* `mc10_dis.py` – quick standalone 6803 disassembler: `python tools/mc10_dis.py MC10.BIN F883 F8F0`.
 * `mc10_mini_keyboard.py` – small executor used to verify the keyboard scan routine at `$F883`.
+
+* `mc10_static.py` – recursive-descent decode and call graph, used by `mc10_label.py` to name routines by which
+  BASIC commands reach them.
+* `run_samples.py` – types every program in `basic/samples` into the headless emulator, runs it and writes
+  `docs/SAMPLES.md` with the resulting screens.

@@ -41,6 +41,6 @@ def dis(a):
         if o==0x60+off: s,l=op('x');return nm+' '+s,l
         if o==0x70+off: s,l=op('e');return nm+' '+s,l
     return "FCB $%02X"%o,1
-a=int(sys.argv[1],16);end=int(sys.argv[2],16)
+a=int(sys.argv[2],16);end=int(sys.argv[3],16)
 while a<end:
     t,l=dis(a);print("%04X  %-9s %s"%(a,d[a-B:a-B+l].hex(' '),t));a+=l

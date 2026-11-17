@@ -66,9 +66,13 @@ namespace MC10.App
             }
             mach.DropDownItems.Add(speed);
 
+            var programs = new ToolStripMenuItem("&Programs");
+            programs.DropDownItems.Add(Item("&Sample programs...  (F4)", Keys.F4, (s, e) => ShowSamples()));
+            programs.DropDownItems.Add(Item("&Paste text as keystrokes  (Ctrl+V)", Keys.None, (s, e) => PasteText()));
+            programs.DropDownItems.Add(Item("&Type BASIC file into the keyboard...", Keys.None, (s, e) => TypeBasicFile()));
+            programs.DropDownItems.Add(Item("&Cancel typing", Keys.None, (s, e) => session.Machine.Keyboard.Clear()));
+
             var analysis = new ToolStripMenuItem("&Analysis");
-            analysis.DropDownItems.Add(Item("&Type BASIC file into the keyboard...", Keys.None, (s, e) => TypeBasicFile()));
-            analysis.DropDownItems.Add(new ToolStripSeparator());
             analysis.DropDownItems.Add(Item("&Re-analyse ROM using run data", Keys.None, (s, e) => ReanalyseWithRunData()));
             analysis.DropDownItems.Add(Item("&Load coverage / targets file...", Keys.None, (s, e) => LoadRunData()));
             analysis.DropDownItems.Add(Item("&Save coverage...", Keys.None, (s, e) => SaveCoverage()));
@@ -76,6 +80,7 @@ namespace MC10.App
 
             menu.Items.Add(file);
             menu.Items.Add(mach);
+            menu.Items.Add(programs);
             menu.Items.Add(analysis);
             MainMenuStrip = menu;
             Controls.Add(menu);
@@ -110,7 +115,13 @@ namespace MC10.App
             if (!string.IsNullOrEmpty(romPath)) LoadRomFile(romPath);
             if (!string.IsNullOrEmpty(symbolsPath)) machine.LoadSymbols(symbolsPath);
             foreach (string f in Program.FindDefaultRunData())
-                try { if (f.EndsWith(".sym")) machine.LoadSymbols(f); else machine.LoadRunData(f); } catch { }
+                try
+                {
+                    if (f.EndsWith("user.sym")) machine.LoadUserSymbols(f);
+                    else if (f.EndsWith(".sym")) machine.LoadSymbols(f);
+                    else machine.LoadRunData(f);
+                }
+                catch { }
             machine.Reanalyze();
 
             KeyPress += (s, e) => HandleKeyPress(e);
@@ -201,6 +212,12 @@ namespace MC10.App
 
         void HandleKeyDown(KeyEventArgs e)
         {
+            if (e.Control && e.KeyCode == Keys.V)            // paste: type the clipboard text
+            {
+                PasteText();
+                e.Handled = e.SuppressKeyPress = true;
+                return;
+            }
             switch (e.KeyCode)
             {
                 case Keys.Escape:                            // BREAK
@@ -252,11 +269,28 @@ namespace MC10.App
             }
         }
 
+        SampleDialog samples;
+
+        void ShowSamples()
+        {
+            if (samples == null || samples.IsDisposed) samples = new SampleDialog(session, Program.FindSamplesFolder());
+            if (!samples.Visible) samples.Show(this);
+            samples.BringToFront();
+        }
+
+        void PasteText()
+        {
+            if (!Clipboard.ContainsText()) return;
+            session.Machine.TypeText(Clipboard.GetText());
+            if (!session.Running) session.Start();
+        }
+
         void TypeBasicFile()
         {
             using var dlg = new OpenFileDialog { Filter = "BASIC / text|*.bas;*.txt|All files|*.*", Title = "Type this file into the MC-10" };
             if (dlg.ShowDialog(this) != DialogResult.OK) return;
-            int skipped = session.Machine.TypeText(File.ReadAllText(dlg.FileName));
+            // Sample files may carry ";;" note lines; only the program itself is typed.
+            int skipped = session.Machine.TypeText(SampleProgram.Load(dlg.FileName).Code);
             if (!session.Running) session.Start();
             if (skipped > 0)
                 MessageBox.Show(this, $"{skipped} character(s) have no key on the MC-10 and were skipped.", "Type BASIC file");

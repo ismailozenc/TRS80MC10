@@ -107,7 +107,7 @@ class Keyboard:
 
     def read_port2(self):
         s = self.strobe()
-        low = (not (s >> 7) & 1 and self.shift) or (not (s >> 2) & 1 and self.ctrl) or (not s & 1 and self.brk)
+        low = (not (s >> 7) & 1 and self.shift) or (not s & 1 and self.ctrl) or (not (s >> 2) & 1 and self.brk)
         return 0xFD if low else 0xFF
 
     def tap_index(self, idx, shift=False, ctrl=False):
@@ -121,6 +121,7 @@ class Keyboard:
         if ch == '\r': self.tap_index(30)
         elif ch == ' ': self.tap_index(31)
         elif ch == '\b': self.tap_index(1, False, True)
+        elif ch == '^': self.tap_index(23, False, True)      # CONTROL+W
         elif 'A' <= ch <= 'Z': self.tap_index(o - 64)
         elif 'a' <= ch <= 'z': self.tap_index(o - 96)
         elif ch == '@': self.tap_index(0)

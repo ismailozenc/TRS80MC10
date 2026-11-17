@@ -9,7 +9,9 @@ A Motorola 6803 based MC-10 emulator for Windows, with:
 - **Keyboard**: a real key matrix (port 1 strobe, rows on `$BFFF`); host characters are replayed as timed key taps. Esc = BREAK, Backspace/Left = CONTROL+A.
 - **Sound**: each write is recorded (cycle and pitch) for inspection.
 - **Disassembler / analyzer**: recursive-descent analysis of the ROM from the interrupt vectors. Labels subroutines (`sub_XXXX`), branch targets (`loc_XXXX`), data (`data_XXXX`), vectors (`reset`, `irq_isr`...), pointer tables (`tbl_`/`fn_`), RAM hooks (`ramfn_`) and 6803 registers (`PORT1`, `KBD_VDG`...). Whole-ROM listing in the debugger (**ROM listing** tab, go-to by address or name, breakpoints by double-click), **File > Export disassembly / Export symbols**.
-- **Debugger**: disassembly with breakpoints, single-step and step-over, run-to-cursor, registers and flags, hex memory with poke, write-watchpoints, instruction history, and a **trace log to file**.
+- **Debugger** (F12): colour-coded disassembly (live from the PC and the whole ROM), breakpoints with conditions and hit counts, step / step over / step out / run to cursor, registers with changed values in red, memory view with change highlighting and editing, stack and call chain, 6803 hardware registers and keyboard matrix, write-watchpoints, instruction history, execution profile, "break when BASIC runs PRINT / SIN / ..." list, rename labels, find references, and a **trace log to file** with call indentation.
+- **Sample programs** (F4): twelve small BASIC programs in `basic/samples`, each with notes on what to watch in the debugger. Ctrl+V pastes text as keystrokes.
+- **Names for the firmware**: `symbols/mc10.sym` (loaded automatically) names every BASIC statement, function and operator handler, the keyboard, screen and floating point helpers, and BASIC's RAM variables. See `docs/ROUTINES.md` and `tools/README.md`.
 - **Tests**: xUnit tests for flag rules, stack and interrupt sequencing, watchpoints, breakpoints, EPROM policy and image loaders.
 
 See `docs/ASSUMPTIONS.md` for what the manual confirms and what is assumed.
@@ -42,7 +44,12 @@ To create a config file with the defaults, call `MachineConfig.Default().Save("m
 | Debugger window | F12 |
 | Debugger: step / step over / step out / run-pause | F10 / F11 / Shift+F11 / F5 |
 | Main window: Machine menu has Run/Pause (F5), Pause (F6), Step (F10), Step over (F11), Step out (Shift+F11) | |
-| Debugger: toggle breakpoint on the selected line | Ctrl+B or double-click |
+| Debugger: toggle breakpoint on the selected line | F9, Ctrl+B or double-click |
+| Debugger listing: follow jump/call target, go back | Enter, Backspace |
+| Debugger listing: rename label, list references, find, go to | F2, Shift+F12, Ctrl+F / F3, Ctrl+G |
+| Sample programs | F4 |
+| Paste text as keystrokes | Ctrl+V |
+| MC-10 keys: BREAK, backspace, `^`, keyword shortcut | Esc, Backspace, `^` (sent as CONTROL+W), Ctrl+letter |
 
 Typed letters are sent in uppercase, matching the MC-10's default all-caps keyboard. Enter, Backspace, and the Left arrow (as backspace) are supported. Esc sends BREAK.
 
@@ -61,7 +68,9 @@ src/MC10.Core          (no UI, unit-testable)
   MachineConfig.cs     memory map and clock (JSON)
 src/MC10.App           WinForms front end
   MainForm.cs          screen, keyboard, menus, trace-to-file, screenshot
-  DebuggerForm.cs      disassembly, registers, memory, watchpoints, history
+  DebuggerForm.cs      debugger window (layout, refresh, toolbar)
+  ListingPanel.cs      colour disassembly views; DebugViews.cs registers, memory, stack, hardware, profile ...
+  SampleDialog.cs      sample program browser
   EmulatorSession.cs   shared run state (60 Hz frame pump)
 tests/MC10.Tests       xUnit tests
 ```

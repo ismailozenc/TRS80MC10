@@ -122,7 +122,7 @@ TESTS = [
     T("OP_SUB", "op", "PRINT 5-3\r", expect=["SUB"]),
     T("OP_MUL", "op", "PRINT 4*3\r", expect=["MUL"]),
     T("OP_DIV", "op", "PRINT 9/3\r", expect=["DIV"]),
-    T("OP_POW", "op", "10 PRINT 2/3\r", ("PATCH", 0xAA, 0xAB), "RUN\r", expect=["POW"]),  # no ^ key: patch the token
+    T("OP_POW", "op", "PRINT 2^3\r", expect=["POW"]),      # ^ is CONTROL+W on the MC-10
     T("OP_AND", "op", "PRINT 6 AND 3\r", expect=["AND"]),
     T("OP_OR", "op", "PRINT 4 OR 1\r", expect=["OR"]),
     T("OP_CMP", "op", "PRINT 1<2;2>1;3=3;NOT 0\r"),
@@ -211,6 +211,105 @@ def run_test(rom_data, test):
                 hw={k: set(v) for k, v in m.hw.items()}, screen=m.screen_text(), base=base_cov, instr=m.instructions)
 
 
+# Names checked by reading the code and by experiment in the emulator (see docs/ROUTINES.md).
+MANUAL = {
+    # RAM: the character fetch routine BASIC copies to the direct page, and its pointer
+    0x00EB: "chrget",             # INC txtptr; fall into chrgot
+    0x00F3: "chrgot",             # LDAA [txtptr]; JMP chrget_classify
+    0x00F4: "txtptr",             # address of the BASIC text being interpreted
+    # RAM: BASIC memory layout pointers (watched while entering lines, DIM, strings, CLEAR)
+    0x0093: "basic_txttab",       # start of the program text
+    0x0095: "basic_vartab",       # end of program = start of simple variables
+    0x0097: "basic_arytab",       # start of arrays
+    0x0099: "basic_aryend",       # end of arrays = start of free memory
+    0x009B: "basic_strbot",       # bottom of string space (moved by CLEAR n)
+    0x009D: "basic_fretop",       # next free byte in string space (grows down)
+    0x00A1: "basic_memtop",       # top of BASIC memory (CLEAR n,addr)
+    0x00A5: "linnum_tmp",         # line number being parsed
+    0x00C9: "fpa0",               # floating point accumulator 0: exponent, 4 mantissa bytes, sign
+    0x00D6: "fpa1",               # floating point accumulator 1
+    0x4215: "usr_vector",         # JMP executed by USR(); points at err_fc until the program changes it
+    0x421C: "kbd_case_flag",      # toggled by SHIFT+0 (upper / lower case mode)
+    0x4239: "kbd_column",         # column being scanned
+    0x423A: "kbd_ctrl_state",     # $FF while CONTROL is down
+    0x423B: "kbd_break_state",    # last state of the BREAK key
+    0x4280: "cursor_addr",        # screen address of the cursor ($4000-$41FF)
+    0x4282: "cursor_color",       # colour bits for keyboard graphics (CONTROL+0 steps it)
+    # ROM
+    0xE1C8: "chrget_classify",    # sets flags for the character just fetched (digit / end of statement)
+    0xE18A: "tbl_error_codes",    # two-letter error codes: NF SN RG OD FC OV OM UL BS DD /0 ID TM OS LS ST CN IO FM
+    0xE21A: "chk_stack_room",     # OM error unless B*2 bytes fit below the stack
+    0xE238: "error_B",            # report error number B, back to the OK prompt
+    0xE6B2: "parse_line_number",  # decimal digits at txtptr -> linnum_tmp
+    0xE7A8: "print_string",
+    0xE7B9: "print_space",
+    0xE7BE: "chrout",             # print the character in A
+    0xE90C: "eval_numeric",       # evaluate an expression that must be a number (TM error otherwise)
+    0xE91A: "eval_expression",    # the expression evaluator
+    0xEA2F: "need_comma",         # SN error unless the next character is ","
+    0xEA31: "need_char_B",        # SN error unless the next character equals B
+    0xEA3C: "err_syntax",
+    0xEB1B: "find_variable",      # parse a variable name, return its address (creates it if new)
+    0xEC2E: "err_fc",             # illegal function call
+    0xEF0D: "eval_byte",          # evaluate an expression into B (0-255)
+    0xF251: "fp_load_fpa0",       # unpack the 5-byte number at X into fpa0
+    0xF26C: "fp_store_fpa0",      # pack fpa0 into 5 bytes at X
+    0xF29F: "fp_copy_fpa0_fpa1",
+    0xF883: "kbd_scan",           # scan the matrix, return the key code in A (0 = none)
+    0xF8CE: "kbd_test_shift",     # strobe column 7 and test port 2 bit 1
+    0xF8D0: "kbd_test_modifier",  # strobe the column in A and test port 2 bit 1
+    0xF8E2: "kbd_read_column",    # write B to port 1, read the row bits from $BFFF
+    0xF97C: "tbl_keys_control",   # CONTROL+key -> keyword token or control code
+    0xF9AB: "tbl_keys_shift",     # SHIFT+key -> graphics character
+    0xF9C6: "console_out",        # character output to screen (or printer)
+}
+
+# Groups of BASIC commands; a routine reached only from one group is named after it.
+FAMILIES = [
+    ("trig", {"SIN", "COS", "TAN"}),
+    ("substr", {"LEFT$", "RIGHT$", "MID$"}),
+    ("gfx", {"SET", "RESET", "POINT", "CLS"}),
+    ("tape", {"CLOAD", "CSAVE", "SKIPF"}),
+    ("list", {"LIST", "LLIST"}),
+    ("print", {"PRINT", "LPRINT"}),
+    ("read", {"READ", "DATA", "RESTORE", "INPUT"}),
+    ("loop", {"FOR", "NEXT"}),
+    ("jump", {"GOTO", "GOSUB", "RETURN", "ON", "RUN", "IF"}),
+    ("str", {"LEN", "STR$", "VAL", "ASC", "CHR$", "LEFT$", "RIGHT$", "MID$", "INKEY$"}),
+    ("fp", {"SGN", "INT", "ABS", "RND", "SQR", "LOG", "EXP", "SIN", "COS", "TAN", "ADD", "SUB", "MUL", "DIV", "POW"}),
+]
+
+
+def owner_names(static, handler, taken):
+    """Name routines by which BASIC commands can reach them through the static call graph."""
+    g = static.graph()
+    owners = {}
+    for cmd, root in handler.items():
+        if root not in g: continue
+        seen, stack = set(), [root]
+        while stack:
+            r = stack.pop()
+            if r in seen: continue
+            seen.add(r)
+            stack.extend(c for c in g.get(r, ()) if c in g)
+        for r in seen: owners.setdefault(r, set()).add(cmd)
+    names = {}
+    total = len(handler)
+    for r in sorted(g):
+        if r in taken or r < ROM_BASE: continue
+        o = owners.get(r)
+        if not o:
+            names[r] = "sys_%04X" % r                 # reached only from reset / interrupts / RAM hooks
+        elif len(o) == 1:
+            names[r] = "%s_%04X" % (safe(next(iter(o))).lower(), r)
+        else:
+            fam = next((f for f, members in FAMILIES if o <= members), None)
+            if fam: names[r] = "%s_%04X" % (fam, r)
+            elif len(o) >= total * 0.6: names[r] = "core_%04X" % r     # used by nearly every command
+            else: names[r] = "util_%04X" % r
+    return names, owners
+
+
 def ranges(addrs):
     out, start, prev = [], None, None
     for a in sorted(addrs):
@@ -252,6 +351,11 @@ def write_outputs(args, data, tab, results, handler, ok, bad):
     syms[tab["stm_tab"]] = "tbl_statement_handlers"
     syms[tab["fn_tab"]] = "tbl_function_handlers"
     syms[tab["ops_tab"]] = "tbl_operators"
+    for a, n in MANUAL.items(): syms[a] = n
+    from mc10_static import Static
+    rom = Rom(data)
+    entries = {rom.w(0xFFF0 + 2 * i) for i in range(8)} | set(handler.values()) | set(calls) | {t for _, t in indirect}
+    static = Static(data, entries)
     evidence = {}
     for kind, name in HW_NAMES.items():
         for pc in hw.get(kind, ()):
@@ -259,7 +363,13 @@ def write_outputs(args, data, tab, results, handler, ok, bad):
             if r is not None and r not in syms:
                 evidence.setdefault(r, set()).add(name)
     for r, names in evidence.items():
-        syms[r] = "io_" + "_".join(sorted(names))
+        syms[r] = "io_" + "_".join(sorted(names)) + "_%04X" % r
+    auto, owners = owner_names(static, handler, syms)
+    syms.update(auto)
+    for i in range(14):                                # RAM hook vectors (all RTS until a program patches them)
+        syms.setdefault(0x4285 + 3 * i, "hook_%04X" % (0x4285 + 3 * i))
+    for i, n in enumerate(["sci", "toi", "oci", "ici", "irq", "swi", "nmi"]):
+        syms.setdefault(0x4200 + 3 * i, "ramvec_" + n)
     os.makedirs(os.path.dirname(os.path.abspath(args.sym)), exist_ok=True)
     with open(args.sym, "w") as f:
         f.write("; Labels derived by running BASIC tests in tools/mc10_emu.py (see tools/mc10_label.py).\n")
@@ -287,6 +397,13 @@ def write_outputs(args, data, tab, results, handler, ok, bad):
             f.write("| function | %s | $%04X | %s |\n" % (n, tab["fn_handlers"][i], "yes" if n in vv else "no"))
         for (pri, a), n in zip(tab["ops"], OPS):
             f.write("| operator | %s | $%04X | %s |\n" % (n, a, "yes" if n in vv else "no"))
+        f.write("\n## Names checked by hand\n\nRead from the disassembly and confirmed by experiment in the emulator.\n\n| Address | Name |\n|---|---|\n")
+        for a in sorted(MANUAL): f.write("| $%04X | %s |\n" % (a, MANUAL[a]))
+        f.write("\n## Names derived from the call graph\n\n"
+                "`print_XXXX` = reached only from PRINT; `fp_`, `str_`, `trig_`, `substr_`, `gfx_`, `tape_`, `list_`, `read_`, "
+                "`loop_`, `jump_` = reached only from that group of commands; `core_` = used by at least 60%% of all commands; "
+                "`util_` = shared by several unrelated commands; `sys_` = not reached from any BASIC command "
+                "(start-up, interrupts, main loop); `io_..._XXXX` = touches that hardware. %d routines named this way.\n" % len(auto))
         f.write("\n## I/O evidence\n\n| Access | Routines containing the access |\n|---|---|\n")
         for k in sorted(hw):
             rs = sorted({routine_of(pc) or 0 for pc in hw[k]})
@@ -308,10 +425,11 @@ def main():
 
     results = {}
     t0 = time.time()
-    for t in TESTS:
-        r = run_test(data, t)
-        results[t["id"]] = r
-        print("%-10s %6d instr  %s" % (t["id"], r["instr"], " | ".join(x for x in r["screen"].split("\n")[3:][-3:])[:70]))
+    from concurrent.futures import ProcessPoolExecutor
+    with ProcessPoolExecutor() as ex:
+        for t, r in zip(TESTS, ex.map(run_test, [data] * len(TESTS), TESTS)):
+            results[t["id"]] = r
+            print("%-10s %6d instr  %s" % (t["id"], r["instr"], " | ".join(x for x in r["screen"].split("\n")[3:][-3:])[:70]))
     print("ran %d tests in %.1fs" % (len(TESTS), time.time() - t0))
 
     # ---- verify handlers

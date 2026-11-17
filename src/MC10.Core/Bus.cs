@@ -14,6 +14,8 @@ namespace MC10.Core
     {
         byte IoRead(ushort addr);
         void IoWrite(ushort addr, byte value);
+        /// <summary>Read a register without side effects (no flag clearing); used by the debugger.</summary>
+        byte IoPeek(ushort addr);
     }
 
     /// <summary>
@@ -81,6 +83,23 @@ namespace MC10.Core
             }
             if (Watched[addr]) WatchHook?.Invoke(addr, false, v);
             return v;
+        }
+
+        /// <summary>
+        /// Read without side effects. The debugger, disassembler and trace use this: a normal read of the
+        /// 6803's timer registers clears flags (reading FRC low clears TOF, OCR low clears OCF), so looking
+        /// at memory $0000-$001F with <see cref="Read"/> would change what the firmware sees.
+        /// </summary>
+        public byte Peek(ushort addr)
+        {
+            switch (kind[addr])
+            {
+                case KRam:
+                case KRom: return Mem[addr];
+                case KIo: return Io.IoPeek(addr);
+                case KDevice: return devices[addr].Read(addr);
+                default: return UnmappedValue;
+            }
         }
 
         public void Write(ushort addr, byte value)

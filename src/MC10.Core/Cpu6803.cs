@@ -172,6 +172,29 @@ namespace MC10.Core
             }
         }
 
+        public byte IoPeek(ushort addr)
+        {
+            int r = addr & 0x1F;
+            switch (r)
+            {
+                case P1Dr:
+                case P2Dr:
+                {
+                    int ddr = Io[r - 2];
+                    int ext = (r == P2Dr && Port2Read != null) ? Port2Read() : PortIn[r - 2];
+                    return (byte)((Io[r] & ddr) | (ext & ~ddr & 0xFF));
+                }
+                case CntH: return (byte)(Frc >> 8);
+                case CntL: return (byte)Frc;
+                case OcrH: return (byte)(Ocr >> 8);
+                case OcrL: return (byte)Ocr;
+                case IcrH: return (byte)(Icr >> 8);
+                case IcrL: return (byte)Icr;
+                case Trcsr: return (byte)(0x20 | Io[Trcsr]);
+                default: return Io[r];
+            }
+        }
+
         public void IoWrite(ushort addr, byte val)
         {
             int r = addr & 0x1F;

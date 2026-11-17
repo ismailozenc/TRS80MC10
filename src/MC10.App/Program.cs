@@ -48,7 +48,7 @@ namespace MC10.App
             {
                 string folder = Path.Combine(dir.FullName, "symbols");
                 if (!Directory.Exists(folder)) continue;
-                foreach (string name in new[] { "mc10.sym", "mc10.targets", "mc10.cov" })
+                foreach (string name in new[] { "mc10.sym", "mc10.targets", "mc10.cov", "user.sym" })
                 {
                     string f = Path.Combine(folder, name);
                     if (File.Exists(f)) result.Add(f);
@@ -56,6 +56,21 @@ namespace MC10.App
                 if (result.Count > 0) break;
             }
             return result;
+        }
+
+        /// <summary>Folder with sample BASIC programs: "samples" next to the exe, or basic/samples in the repo.</summary>
+        internal static string FindSamplesFolder()
+        {
+            var dir = new DirectoryInfo(AppContext.BaseDirectory);
+            for (int depth = 0; depth < 8 && dir != null; depth++, dir = dir.Parent)
+            {
+                foreach (string rel in new[] { "samples", Path.Combine("basic", "samples") })
+                {
+                    string folder = Path.Combine(dir.FullName, rel);
+                    if (Directory.Exists(folder) && Directory.GetFiles(folder, "*.bas").Length > 0) return folder;
+                }
+            }
+            return null;
         }
 
         static readonly string[] RomExtensions = { ".bin", ".rom", ".hex", ".ihx", ".s19" };

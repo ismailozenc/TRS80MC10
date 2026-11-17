@@ -14,6 +14,9 @@ namespace MC10.App
         /// <summary>1.0 = real time (approximately 0.89 MHz). Values above 1 run faster than real hardware.</summary>
         public double Speed { get; set; } = 1.0;
         public StopReason LastStop => Machine.LastStop;
+        /// <summary>Speed up emulation while bulk text (paste, sample program) is being typed.</summary>
+        public bool TurboTyping { get; set; } = true;
+        public int TypingBoost { get; set; } = 10;
 
         public event Action StateChanged;
         public event Action<StopReason> Stopped;
@@ -48,13 +51,20 @@ namespace MC10.App
         public void Frame()
         {
             if (!Running) return;
-            Machine.Keyboard.Advance();
-            StopReason r = Machine.RunCycles(Math.Max(1000, CyclesPerFrame));
-            if (r != StopReason.Budget)
+            // While a pasted text or sample program is being typed, run several emulated frames per tick
+            // so long listings go in quickly; the firmware sees exactly the same key timing.
+            int frames = TurboTyping && Machine.Keyboard.TextPending > 0 ? TypingBoost : 1;
+            for (int i = 0; i < frames; i++)
             {
-                Running = false;
-                Stopped?.Invoke(r);
-                StateChanged?.Invoke();
+                Machine.Keyboard.Advance();
+                StopReason r = Machine.RunCycles(Math.Max(1000, CyclesPerFrame));
+                if (r != StopReason.Budget)
+                {
+                    Running = false;
+                    Stopped?.Invoke(r);
+                    StateChanged?.Invoke();
+                    return;
+                }
             }
         }
 
