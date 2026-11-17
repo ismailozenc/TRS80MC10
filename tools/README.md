@@ -17,3 +17,8 @@ These are Python 3 scripts with no dependencies. They are not needed to build or
 The WinForms app loads `symbols/mc10.*` automatically (they are copied next to the executable) and shades
 executed lines green in the ROM listing. **Analysis > Type BASIC file** feeds `basic/*.bas` into the keyboard,
 and **Analysis > Re-analyse ROM using run data** folds the observed call targets back into the disassembly.
+
+Older exploration scripts (usage: `python tools/<script> MC10.BIN`):
+
+* `mc10_dis.py` – quick standalone 6803 disassembler of the ROM.
+* `mc10_mini_keyboard.py` – small executor used to verify the keyboard scan routine at `$F883`.
