@@ -57,11 +57,13 @@ namespace MC10.Core
             set { A = (byte)(value >> 8); B = (byte)value; }
         }
 
+        /// <summary>
+        /// The RESET line. Like the real 6803 this masks interrupts, clears the internal registers and loads
+        /// PC from $FFFE; A, B, X and SP keep their values. That matters: the MC-10 warm-start code calls a
+        /// subroutine before it reloads the stack pointer, so it needs SP to still point into RAM.
+        /// </summary>
         public void Reset()
         {
-            A = B = 0;
-            X = 0;
-            SP = 0;
             CC = FlagI;
             Halted = false;
             Cycles = 0;
