@@ -23,7 +23,9 @@ namespace MC10.App
 
         readonly TabControl codeTabs, sideTabs;
         readonly TabPage livePage, romPage, labelsPage, basicPage, profilePage;
-        readonly TabPage memoryPage, stackPage, hardwarePage, breakPage, watchPage, historyPage;
+        readonly TabPage memoryPage, autosPage, watchListPage, stackPage, hardwarePage, breakPage, watchPage, historyPage;
+        readonly AutosView autos;
+        readonly WatchListView watchList;
         readonly ListingPanel liveListing, romListing;
         readonly ListBox labelList;
         readonly TextBox labelFilter, memAddr;
@@ -146,11 +148,21 @@ namespace MC10.App
             history.GoToRequested += ShowRom;
 
             sideTabs = new TabControl { Dock = DockStyle.Fill };
+            autos = new AutosView(machine);
+            autos.GoToRequested += (addr, isCode) =>
+            {
+                if (isCode) ShowRom(addr); else ShowMemory(addr);
+            };
+            watchList = new WatchListView(machine);
+            watchList.GoToRequested += ShowMemory;
+
             memoryPage = Page(sideTabs, "Memory", memPanel);
+            autosPage = Page(sideTabs, "Autos", autos);
+            watchListPage = Page(sideTabs, "Watch", watchList);
             stackPage = Page(sideTabs, "Stack / calls", stack);
             hardwarePage = Page(sideTabs, "Hardware", hardware);
             breakPage = Page(sideTabs, "Breakpoints", breakpoints);
-            watchPage = Page(sideTabs, "Watch writes", watches);
+            watchPage = Page(sideTabs, "Break on write", watches);
             historyPage = Page(sideTabs, "History", history);
             sideTabs.SelectedIndexChanged += (s, e) => RefreshAll();
 
@@ -342,6 +354,8 @@ namespace MC10.App
         {
             TabPage page = sideTabs.SelectedTab;
             if (page == memoryPage) memory.Reload();
+            else if (page == autosPage) autos.Reload();
+            else if (page == watchListPage) watchList.Reload();
             else if (page == stackPage) stack.Reload();
             else if (page == hardwarePage) hardware.Reload();
             else if (page == breakPage) breakpoints.Reload();

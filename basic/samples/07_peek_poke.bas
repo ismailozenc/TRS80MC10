@@ -1,6 +1,6 @@
 ;; title: 07 PEEK and POKE - writing straight to screen memory
 ;; summary: The screen is 512 bytes at 16384 ($4000). POKE puts character codes there; PEEK reads them back.
-;; look: Add a write-watch on 4020 ("Watch writes" tab), RUN, and the debugger stops on the instruction that writes it.
+;; look: Add a write-watch on 4020 ("Break on write" tab), RUN, and the debugger stops on the instruction that writes it.
 ;; look: Codes 0-63 are reverse video, 64-127 normal, 128-255 colour blocks.
 ;; break: stm_POKE, fn_PEEK
 10 CLS

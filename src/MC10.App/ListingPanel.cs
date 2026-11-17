@@ -35,7 +35,9 @@ namespace MC10.App
         readonly FlickerFreeList list;
         readonly TextBox goBox;
         readonly CheckBox follow, showCoverage;
-        readonly Label info;
+        readonly Label info, explain;
+        readonly ToolTip tip;
+        int hoverIndex = -1;
         readonly Font mono = new Font("Consolas", 10f, FontStyle.Regular, GraphicsUnit.Point);
         readonly Font monoBold = new Font("Consolas", 10f, FontStyle.Bold, GraphicsUnit.Point);
         readonly float charWidth;
@@ -103,8 +105,42 @@ namespace MC10.App
             list.KeyDown += (s, e) => HandleKey(e);
             list.ContextMenuStrip = BuildMenu();
 
+            // What the selected instruction does (with current values when it is the next one to run).
+            explain = new Label
+            {
+                Dock = DockStyle.Bottom,
+                Height = 40,
+                Padding = new Padding(6, 3, 6, 0),
+                BackColor = Color.FromArgb(255, 252, 228),
+                AutoEllipsis = true,
+            };
+            list.SelectedIndexChanged += (s, e) => UpdateExplain();
+
+            // Hover preview: explanation, memory contents or the code at a jump target.
+            tip = new ToolTip { OwnerDraw = true, InitialDelay = 400, ReshowDelay = 100, AutoPopDelay = 30000, UseAnimation = false, UseFading = false };
+            tip.Popup += (s, e) =>
+            {
+                Size size = TextRenderer.MeasureText(tip.GetToolTip(e.AssociatedControl), mono, new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPadding);
+                e.ToolTipSize = new Size(size.Width + 14, size.Height + 10);
+            };
+            tip.Draw += (s, e) =>
+            {
+                using (var back = new SolidBrush(Color.FromArgb(255, 255, 228))) e.Graphics.FillRectangle(back, e.Bounds);
+                e.DrawBorder();
+                TextRenderer.DrawText(e.Graphics, e.ToolTipText, mono, new Point(7, 5), Color.Black, TextFormatFlags.NoPadding);
+            };
+            list.MouseMove += (s, e) =>
+            {
+                int i = list.IndexFromPoint(e.Location);
+                if (i == hoverIndex) return;
+                hoverIndex = i;
+                tip.SetToolTip(list, BuildHover(i));
+            };
+            list.MouseLeave += (s, e) => { hoverIndex = -1; tip.SetToolTip(list, ""); };
+
             Controls.Add(list);
             Controls.Add(bar);
+            Controls.Add(explain);
             list.BringToFront();
         }
 
@@ -212,13 +248,105 @@ namespace MC10.App
         public void Sync(bool running)
         {
             if (!Visible) return;
-            if (live) { SyncLive(running); return; }
+            if (live) { SyncLive(running); UpdateExplain(); return; }
 
             if (!ReferenceEquals(built, machine.Analysis) || builtSymbols != machine.SymbolVersion) RebuildRom();
             int pc = machine.Cpu.PC;
             if (follow.Checked && !running && pc != lastPc) NavigateTo((ushort)pc, false);
             lastPc = pc;
             list.Invalidate();
+            UpdateExplain();
+        }
+
+        // ------------------------------------------------------------ explanations and hover previews
+        string ExplainCode(ushort addr) =>
+            addr == machine.Cpu.PC ? InstructionGuide.DescribeLive(machine, addr)
+                                   : InstructionGuide.Describe(machine.Bus.Peek, addr, machine.Cpu.X, machine.SymbolFor, machine.CodeSymbolFor);
+
+        string LabelSummary(ushort addr)
+        {
+            Analysis an = machine.Analysis;
+            string name = machine.CodeSymbolFor(addr) ?? "$" + addr.ToString("X4");
+            if (an == null) return name;
+            int calls = an.Callers.TryGetValue(addr, out var c) ? c.Count : 0;
+            int refs = an.Refs.TryGetValue(addr, out var r) ? r.Count : 0;
+            return $"{name}: called from {calls} place(s), referenced from {refs}. Shift+F12 lists them.";
+        }
+
+        void UpdateExplain()
+        {
+            ListingLine l = SelectedLine;
+            string text = "";
+            if (l != null && l.Kind == LineKind.Code) text = ExplainCode(l.Address);
+            else if (l != null && l.Kind == LineKind.Label) text = LabelSummary(l.Address);
+            if (explain.Text != text) explain.Text = text;
+        }
+
+        static IEnumerable<string> Wrap(string text, int width)
+        {
+            while (text.Length > width)
+            {
+                int cut = text.LastIndexOf(' ', width);
+                if (cut <= 0) cut = width;
+                yield return text.Substring(0, cut);
+                text = text.Substring(cut).TrimStart();
+            }
+            if (text.Length > 0) yield return text;
+        }
+
+        string MemoryLine(ushort addr)
+        {
+            var hex = new System.Text.StringBuilder();
+            var chars = new System.Text.StringBuilder();
+            for (int i = 0; i < 8; i++)
+            {
+                byte b = machine.Bus.Peek((ushort)(addr + i));
+                hex.Append(b.ToString("X2")).Append(' ');
+                chars.Append(b >= 0x20 && b < 0x7F ? (char)b : '.');
+            }
+            int word = (machine.Bus.Peek(addr) << 8) | machine.Bus.Peek((ushort)(addr + 1));
+            string name = machine.SymbolFor(addr);
+            return $"${addr:X4}{(name != null ? " " + name : "")}:  {hex} |{chars}|   as a word: ${word:X4}";
+        }
+
+        string BuildHover(int index)
+        {
+            if (index < 0 || index >= lines.Count) return "";
+            ListingLine l = lines[index];
+            var text = new List<string>();
+            if (l.Kind == LineKind.Code)
+            {
+                text.AddRange(Wrap(ExplainCode(l.Address), 86));
+                OperandInfo o = InstructionGuide.Operand(machine.Bus.Peek, l.Address, machine.Cpu.X);
+                if (o.HasAddress && o.IsCodeTarget)
+                {
+                    text.Add("");
+                    text.Add(o.UsesX ? "Goes to (with X as it is now):" : "Goes to:");
+                    text.AddRange(InstructionGuide.Preview(machine, o.Address, 6));
+                }
+                else if (o.HasAddress)
+                {
+                    text.Add("");
+                    text.Add("Memory now" + (o.UsesX ? " (with X as it is now):" : ":"));
+                    text.Add(MemoryLine(o.Address));
+                }
+                else if (o.IsImmediate && o.Mode == Mode.Imm16 && machine.Bus.IsMapped((ushort)o.Immediate))
+                {
+                    text.Add("");
+                    text.Add("If the value is an address, the memory there now:");
+                    text.Add(MemoryLine((ushort)o.Immediate));
+                }
+            }
+            else if (l.Kind == LineKind.Label)
+            {
+                text.Add(LabelSummary(l.Address));
+            }
+            else if (l.Kind == LineKind.Data && TryOperandTarget(l, out ushort target, out bool isCode))
+            {
+                text.Add("Table entry, points to:");
+                text.AddRange(InstructionGuide.Preview(machine, target, 6));
+            }
+            return string.Join("\n", text);
         }
 
         void SyncLive(bool running)
